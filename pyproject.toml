@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "project-name"
+name = "pvcast-frontend"
 version = "0.0.0"
-description = "My Project Description"
-authors = ["My Name <name@company.com>"]
-maintainers = ["My Name <name@company.com>"]
+description = "PVCast frontend"
+authors = ["Stefan de Lange <langestefan@msn.com>"]
+maintainers = ["Stefan de Lange <langestefan@msn.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/langestefan/python-package-template"
-repository = "https://github.com/langestefan/python-package-template"
-documentation = "https://github.com/langestefan/python-package-template"
+homepage = "https://github.com/Open-HEMS/pvcast-frontend"
+repository = "https://github.com/Open-HEMS/pvcast-frontend"
+documentation = "https://github.com/Open-HEMS/pvcast-frontend"
 keywords = ["project", "template", "python", "package"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -20,7 +20,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 packages = [
-  { include = "mypackage"}
+  { include = "pvcastfrontend"}
 ]
 
 [tool.poetry.dependencies]
@@ -28,8 +28,8 @@ python = "^3.12"
 solara = "^1.25.1"
 
 [tool.poetry.urls]
-"Bug Tracker" = "https://github.com/langestefan/python-package-template/issues"
-Changelog = "https://github.com/langestefan/python-package-template/releases"
+"Bug Tracker" = "https://github.com/Open-HEMS/pvcast-frontend/issues"
+Changelog = "https://github.com/Open-HEMS/pvcast-frontend/releases"
 
 [tool.poetry.group.dev.dependencies]
 blacken-docs = "1.16.0"
@@ -51,7 +51,7 @@ yamllint = "1.33.0"
 
 [tool.coverage.run]
 plugins = ["covdefaults"]
-source = ["mypackage"]
+source = ["pvcastfrontend"]
 
 [tool.coverage.report]
 fail_under = 90
@@ -128,7 +128,7 @@ ignore-paths = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov mypackage --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
+addopts = "--cov-report xml:coverage.xml --cov pvcastfrontend --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
 log_cli = true
 log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
@@ -172,7 +172,7 @@ mark-parentheses = false
 fixture-parentheses = false
 
 [tool.ruff.isort]
-known-first-party = ["mypackage"]
+known-first-party = ["pvcastfrontend"]
 
 [tool.ruff.mccabe]
 max-complexity = 25

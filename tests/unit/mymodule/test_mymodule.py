@@ -19,6 +19,6 @@ class TestMyModule:
     def test_main(self) -> None:
         """Test main."""
         # pylint: disable=import-outside-toplevel
-        from mypackage import __main__
+        from pvcastfrontend import __main__
 
         __main__.main()
