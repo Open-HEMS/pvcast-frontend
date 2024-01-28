@@ -25,6 +25,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
+solara = "^1.25.1"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/langestefan/python-package-template/issues"
