@@ -110,28 +110,32 @@ def PVPlantListItem(
     # edit button
     edit, set_edit = solara.use_state(initial=False)
 
-    # counter for array names
-    array_counter, set_array_counter = solara.use_reactive()
     # card
-    with solara.Card(f"🌻 PV Plant: {pvplant.value.name}"):
-        with vue.ListItem():
-            with solara.Column():
+    with solara.Card(f"🌻 PV plant: {pvplant.value.name}"):
+        with solara.v.ListItem():
+            with solara.Column(style={"width": "100%"}):
                 with solara.Row():
                     solara.Button(
                         "EDIT PLANT",
                         icon_name="mdi-pencil",
                         on_click=lambda: set_edit(True),
+                        style={"flex-grow": "1"},
                     )
                     solara.Button(
                         "DELETE PLANT",
                         icon_name="mdi-delete",
                         on_click=lambda: on_delete(pvplant.value),
+                        style={"flex-grow": "1"},
                     )
-                with solara.Card(f"☀️ PV arrays for {pvplant.value.name}"):
-                    with solara.Row():
-                        solara.Button(
-                            "ADD ARRAY", icon_name="mdi-plus", color="primary"
-                        )
+                with solara.Card(f"☀️ PV arrays for: {pvplant.value.name}"):
+                    solara.Button(
+                        "ADD ARRAY",
+                        icon_name="mdi-plus",
+                        color="primary",
+                        on_click=lambda: pvplant.value.arrays.append(
+                            ArrayConfig(name="New array")
+                        ),
+                    )
 
             with vue.Dialog(
                 v_model=edit, persistent=True, max_width="500px", on_v_model=set_edit
@@ -148,6 +152,7 @@ def PVPlantListItem(
                         on_delete=on_delete_in_edit,
                         on_close=lambda: set_edit(False),
                     )
+
 
 
 @solara.component
@@ -227,7 +232,7 @@ def ArrayEdit(
 
 
 @solara.component
-def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
+def PVPlantNew(on_new_plant: Callable[[PVPlant], None]) -> ValueElement:
     """Component that manages entering new pvplants."""
     new_name, set_new_name = solara.use_state("")
     name_field = vue.TextField(
@@ -239,23 +244,45 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
         if not new_name:
             return
         new_item = PVPlant(name=new_name)
-        on_new(new_item)
+        on_new_plant(new_item)
         # reset name
         set_new_name("")
 
     vue.use_event(name_field, "keydown.enter", create_new_item)
     return name_field
 
+@solara.component
+def ArrayNew(on_new_array: Callable[[ArrayConfig], None]) -> ValueElement:
+    """Component that manages entering new arrays."""
+
+    def create_new_item(*ignore_args) -> None:
+        """Create a new item, and reset fields."""
+
+
+
+
 
 class State:
     """State for the pvcast configuration page."""
 
-    pvplants = solara.reactive([])
+    pvplants: solara.Reactive[dict[PVPlant]] = solara.reactive({})
 
     @staticmethod
-    def on_new(item: PVPlant) -> None:
+    def on_new_plant(plant: PVPlant) -> None:
         """Add a new item to the list of items."""
-        State.pvplants.value = [item, *State.pvplants.value]
+        for key in State.pvplants.value:
+            # name must be unique
+            if key == plant.name:
+                return
+
+        # add new item
+        State.pvplants.value = {plant.name: plant, **State.pvplants.value}
+
+    @staticmethod
+    def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
+        """Add a new array to a plant."""
+
+
 
     @staticmethod
     def on_delete(item: PVPlant) -> None:
@@ -285,11 +312,13 @@ def Page() -> ValueElement:
                     f"Number of configured PV plants: {len(State.pvplants.value)}"
                 )
                 solara.Markdown("## 🌱 PV plants")
-                PVPlantNew(on_new=State.on_new)
+                PVPlantNew(on_new_plant=State.on_new_plant)
                 if State.pvplants.value:
-                    for index, item in enumerate(State.pvplants.value):
-                        pvplant = Ref(State.pvplants.fields[index])
-                        PVPlantListItem(pvplant, on_delete=State.on_delete)
+                    # make plant attribute a reactive variable
+                    for plant_name in State.pvplants.value:
+                        pv_plant = Ref(State.pvplants.fields[plant_name])
+                        PVPlantListItem(pv_plant, on_delete=State.on_delete)
+
                 else:
                     solara.Info(
                         "No PV plants configured yet. Enter a PV plant name and hit enter."
