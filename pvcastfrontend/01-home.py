@@ -14,6 +14,8 @@ def Page() -> ValueElement:
     """Home page."""
     solara.Title("Home page")
     with solara.Column():
-        solara.Info("""
+        solara.Info(
+            """
                     This is the home page. You can navigate to the other pages using the bar at the top.
-                    """)
+                    """
+        )

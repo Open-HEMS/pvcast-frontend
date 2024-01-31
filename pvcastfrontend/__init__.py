@@ -8,6 +8,7 @@ import solara
 if TYPE_CHECKING:
     from reacton.core import ValueElement
 
+
 @solara.component
 def Layout(children: Any) -> ValueElement:
     """Solara app layout."""

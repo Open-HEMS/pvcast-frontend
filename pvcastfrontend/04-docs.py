@@ -14,4 +14,6 @@ def Page() -> ValueElement:
     """Swagger documentation page for pvcast."""
     with solara.Column():
         solara.Title("API documentation")
-        solara.Info("""This page contains the swagger documentation for the pvcast API.""")
+        solara.Info(
+            """This page contains the swagger documentation for the pvcast API."""
+        )
