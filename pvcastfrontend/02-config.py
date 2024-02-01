@@ -64,14 +64,14 @@ def PVPlantEdit(
     on_delete: Callable[[], None],
     on_close: Callable[[], None],
 ) -> ValueElement:
-    """Take a reactive pvplant and allows editing it.
+    """Take a reactive pv_plant and allows editing it.
 
     Will not modify the original item until 'save' is clicked.
     """
     copy = solara.use_reactive(pv_plant.value)
 
     def save() -> None:
-        """Save the edited pvplant."""
+        """Save the edited pv_plant."""
         pv_plant.set(copy.value)
         on_close()
 
@@ -104,7 +104,7 @@ def PVPlantEdit(
 
 @solara.component
 def PVPlantListItem(
-    pvplant: solara.Reactive[PVPlant], on_delete: Callable[[PVPlant], None]
+    pv_plant: solara.Reactive[PVPlant], on_delete: Callable[[PVPlant], None]
 ) -> ValueElement:
     """Display a single PV plant item, modifications are done 'in place'.
 
@@ -115,7 +115,7 @@ def PVPlantListItem(
     edit, set_edit = solara.use_state(initial=False)
 
     # card
-    with solara.Card(f"🌻 PV plant: {pvplant.value.name}"):
+    with solara.Card(f"🌻 PV plant: {pv_plant.value.name}"):
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%"}):
                 with solara.Row():
@@ -128,12 +128,18 @@ def PVPlantListItem(
                     solara.Button(
                         "DELETE PLANT",
                         icon_name="mdi-delete",
-                        on_click=lambda: on_delete(pvplant.value),
+                        on_click=lambda: on_delete(pv_plant.value),
                         style={"flex-grow": "1"},
                     )
-                with solara.Card(f"☀️ Arrays for: {pvplant.value.name}"):
-                    print(f"Arrays: {pvplant.value.arrays} for plant {pvplant.value.name}")
-                    ArrayNew(on_new=State.on_new_array, plant=pvplant.value)
+
+                # list all arrays for this plant
+                if pv_plant.value.arrays:
+                    # list all arrays for this plant
+                    for index, array in enumerate(pv_plant.value.arrays):
+                        pv_array = Ref(pv_plant.fields.arrays[index])
+                        ArrayListItem(pv_array, on_delete=State.on_delete_array)
+                ArrayNew(on_new=State.on_new_array, plant=pv_plant.value)
+
 
 
             with vue.Dialog(
@@ -143,11 +149,11 @@ def PVPlantListItem(
 
                     def on_delete_in_edit() -> None:
                         """Delete the item, and close the dialog."""
-                        on_delete(pvplant.value)
+                        on_delete(pv_plant.value)
                         set_edit(False)
 
                     PVPlantEdit(
-                        pvplant,
+                        pv_plant,
                         on_delete=on_delete_in_edit,
                         on_close=lambda: set_edit(False),
                     )
@@ -163,16 +169,15 @@ def ArrayListItem(
     For demonstration purposes, we allow editing the item in a dialog as well.
     This will not modify the original item until 'save' is clicked.
     """
-    with solara.Card(f"🌻 Array: {array.value.name}"):
+    with solara.Card(f"⚡ {array.value.name}", margin=0, style={"backgroud-color": "green"}):
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%"}):
-                with solara.Row():
-                    solara.Button(
-                        "DELETE ARRAY",
-                        icon_name="mdi-delete",
-                        on_click=lambda: on_delete(array.value),
-                        style={"flex-grow": "1"},
-                    )
+                solara.Button(
+                    "DELETE ARRAY",
+                    icon_name="mdi-delete",
+                    on_click=lambda: on_delete(array.value),
+                    style={"flex-grow": "1"},
+                )
 
 
 
@@ -255,6 +260,7 @@ def ArrayNew(on_new: Callable[[ArrayConfig], None], plant: PVPlant) -> ValueElem
         icon_name="mdi-plus",
         color="primary",
         on_click=lambda: on_new(plant, ArrayConfig()),
+        style={"flex-grow": "1", "width": "100%"},
     )
 
 
@@ -282,7 +288,7 @@ class State:
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
-        array.name = f"{plant.name} Array {len(plant.arrays)}"
+        array.name = f"Array {len(plant.arrays)}"
         plant.arrays.append(array)
         State.pvplants.value = {plant.name: plant, **State.pvplants.value}
 
@@ -290,7 +296,6 @@ class State:
     def on_delete_plant(plant: PVPlant) -> None:
         """Delete a plant from the plant dictionary."""
         try:
-            print(f"Deleting plant {plant.name}")
             new_dict = dict(State.pvplants.value)
             new_dict.pop(plant.name)
             State.pvplants.value = new_dict
@@ -326,14 +331,14 @@ def Page() -> ValueElement:
                 if State.pvplants.value:
 
                     # list all plants
-                    for plant_name in State.pvplants.value:
-                        pv_plant = Ref(State.pvplants.fields[plant_name])
+                    for plant in State.pvplants.value:
+                        pv_plant = Ref(State.pvplants.fields[plant])
                         PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
 
-                        # list all arrays for this plant
-                        for array in pv_plant.value.arrays:
-                            pv_array = solara.Reactive(array)
-                            ArrayListItem(pv_array, on_delete=State.on_delete_array)
+                        # # list all arrays for this plant
+                        # for index, array in enumerate(pv_plant.value.arrays):
+                        #     pv_array = Ref(pv_plant.fields.arrays[index])
+                        #     ArrayListItem(pv_array, on_delete=State.on_delete_array)
 
 
                 else:
