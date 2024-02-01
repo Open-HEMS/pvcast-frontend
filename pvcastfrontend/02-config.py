@@ -140,8 +140,6 @@ def PVPlantListItem(
                         ArrayListItem(pv_array, on_delete=State.on_delete_array)
                 ArrayNew(on_new=State.on_new_array, plant=pv_plant.value)
 
-
-
             with vue.Dialog(
                 v_model=edit, persistent=True, max_width="500px", on_v_model=set_edit
             ):
@@ -159,7 +157,6 @@ def PVPlantListItem(
                     )
 
 
-
 @solara.component
 def ArrayListItem(
     array: solara.Reactive[ArrayConfig], on_delete: Callable[[ArrayConfig], None]
@@ -169,7 +166,9 @@ def ArrayListItem(
     For demonstration purposes, we allow editing the item in a dialog as well.
     This will not modify the original item until 'save' is clicked.
     """
-    with solara.Card(f"⚡ {array.value.name}", margin=0, style={"backgroud-color": "green"}):
+    with solara.Card(
+        f"⚡ {array.value.name}", margin=0, style={"backgroud-color": "green"}
+    ):
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%"}):
                 solara.Button(
@@ -178,8 +177,6 @@ def ArrayListItem(
                     on_click=lambda: on_delete(array.value),
                     style={"flex-grow": "1"},
                 )
-
-
 
 
 @solara.component
@@ -252,6 +249,7 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
     vue.use_event(name_field, "keydown.enter", create_new_item)
     return name_field
 
+
 @solara.component
 def ArrayNew(on_new: Callable[[ArrayConfig], None], plant: PVPlant) -> ValueElement:
     """Component that manages entering new arrays."""
@@ -262,11 +260,6 @@ def ArrayNew(on_new: Callable[[ArrayConfig], None], plant: PVPlant) -> ValueElem
         on_click=lambda: on_new(plant, ArrayConfig()),
         style={"flex-grow": "1", "width": "100%"},
     )
-
-
-
-
-
 
 
 class State:
@@ -307,6 +300,7 @@ class State:
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Delete an array from a plant."""
 
+
 @solara.component
 def Page() -> ValueElement:
     """Build the configuration page.
@@ -329,18 +323,10 @@ def Page() -> ValueElement:
                 solara.Markdown("## 🌱 PV plants")
                 PVPlantNew(on_new=State.on_new_plant)
                 if State.pvplants.value:
-
                     # list all plants
                     for plant in State.pvplants.value:
                         pv_plant = Ref(State.pvplants.fields[plant])
                         PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
-
-                        # # list all arrays for this plant
-                        # for index, array in enumerate(pv_plant.value.arrays):
-                        #     pv_array = Ref(pv_plant.fields.arrays[index])
-                        #     ArrayListItem(pv_array, on_delete=State.on_delete_array)
-
-
                 else:
                     solara.Info(
                         "No PV plants configured yet. Enter a PV plant name and hit enter."
