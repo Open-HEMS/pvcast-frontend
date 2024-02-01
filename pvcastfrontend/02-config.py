@@ -133,12 +133,10 @@ def PVPlantListItem(
                     )
 
                 # list all arrays for this plant
-                if pv_plant.value.arrays:
-                    # list all arrays for this plant
-                    for index, array in enumerate(pv_plant.value.arrays):
-                        pv_array = Ref(pv_plant.fields.arrays[index])
-                        ArrayListItem(pv_array, on_delete=State.on_delete_array)
-                ArrayNew(on_new=State.on_new_array, plant=pv_plant.value)
+                for index in range(len(pv_plant.value.arrays)):
+                    array = Ref(pv_plant.fields.arrays[index])
+                    ArrayListItem(pv_plant, array, on_delete=State.on_delete_array)
+                ArrayNew(on_new=State.on_new_array, plant=pv_plant)
 
             with vue.Dialog(
                 v_model=edit, persistent=True, max_width="500px", on_v_model=set_edit
@@ -159,7 +157,9 @@ def PVPlantListItem(
 
 @solara.component
 def ArrayListItem(
-    array: solara.Reactive[ArrayConfig], on_delete: Callable[[ArrayConfig], None]
+    pv_plant: solara.Reactive[PVPlant],
+    array: solara.Reactive[ArrayConfig],
+    on_delete: Callable[[ArrayConfig], None],
 ) -> ValueElement:
     """Display a single array item, modifications are done 'in place'.
 
@@ -174,7 +174,7 @@ def ArrayListItem(
                 solara.Button(
                     "DELETE ARRAY",
                     icon_name="mdi-delete",
-                    on_click=lambda: on_delete(array.value),
+                    on_click=lambda: on_delete(pv_plant.value, array.value),
                     style={"flex-grow": "1"},
                 )
 
@@ -225,7 +225,7 @@ def ArrayEdit(
 
 @solara.component
 def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
-    """Component that manages entering new pvplants.
+    """Component that manages entering new pv_plants.
 
     This component will create a new PVPlant object, and pass it to the on_new callback.
 
@@ -251,13 +251,15 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
 
 
 @solara.component
-def ArrayNew(on_new: Callable[[ArrayConfig], None], plant: PVPlant) -> ValueElement:
+def ArrayNew(
+    on_new: Callable[[ArrayConfig], None], plant: solara.Reactive[PVPlant]
+) -> ValueElement:
     """Component that manages entering new arrays."""
     solara.Button(
         "ADD ARRAY",
         icon_name="mdi-plus",
         color="primary",
-        on_click=lambda: on_new(plant, ArrayConfig()),
+        on_click=lambda: on_new(plant.value, ArrayConfig()),
         style={"flex-grow": "1", "width": "100%"},
     )
 
@@ -265,40 +267,41 @@ def ArrayNew(on_new: Callable[[ArrayConfig], None], plant: PVPlant) -> ValueElem
 class State:
     """State for the pvcast configuration page."""
 
-    pvplants: solara.Reactive[dict[PVPlant]] = solara.reactive({})
+    pv_plants: solara.Reactive[dict[str, PVPlant]] = solara.reactive({})
 
     @staticmethod
     def on_new_plant(plant: PVPlant) -> None:
         """Add a new item to the list of items."""
-        for key in State.pvplants.value:
-            # name must be unique
+        for key in State.pv_plants.value:
             if key == plant.name:
                 return
-
-        # add new item
-        State.pvplants.value = {plant.name: plant, **State.pvplants.value}
+        State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
 
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
         array.name = f"Array {len(plant.arrays)}"
         plant.arrays.append(array)
-        State.pvplants.value = {plant.name: plant, **State.pvplants.value}
+        State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
 
     @staticmethod
     def on_delete_plant(plant: PVPlant) -> None:
         """Delete a plant from the plant dictionary."""
         try:
-            new_dict = dict(State.pvplants.value)
+            new_dict = dict(State.pv_plants.value)
             new_dict.pop(plant.name)
-            State.pvplants.value = new_dict
-            _LOGGER.debug("Deleted plant %s. New plant dict: %s", plant.name, new_dict)
+            State.pv_plants.set(new_dict)
         except KeyError:
             pass
 
     @staticmethod
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Delete an array from a plant."""
+        try:
+            plant.arrays.remove(array)
+            State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
+        except ValueError:
+            pass
 
 
 @solara.component
@@ -313,24 +316,27 @@ def Page() -> ValueElement:
     with solara.Column():
         solara.Title("Plant configuration")
         solara.Info("On this page you can configure your PV plant(s).")
-        with solara.Columns([2, 3]):
+        with solara.Columns([4, 7]):
             # active configuration
             with solara.Card():
                 solara.Title("Active configuration")
                 solara.Success(
-                    f"Number of configured PV plants: {len(State.pvplants.value)}"
+                    f"Number of configured PV plants: {len(State.pv_plants.value)}"
                 )
                 solara.Markdown("## 🌱 PV plants")
                 PVPlantNew(on_new=State.on_new_plant)
-                if State.pvplants.value:
-                    # list all plants
-                    for plant in State.pvplants.value:
-                        pv_plant = Ref(State.pvplants.fields[plant])
-                        PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
-                else:
+
+                # list all plants
+                if (
+                    not State.pv_plants.value
+                ):  # the reactive var is never false, but .value can be (when empty)
                     solara.Info(
                         "No PV plants configured yet. Enter a PV plant name and hit enter."
                     )
+                else:
+                    for _, plant_name in enumerate(State.pv_plants.value):
+                        pv_plant = Ref(State.pv_plants.fields[plant_name])
+                        PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
 
             # field we are currently editing
             with solara.Card():
