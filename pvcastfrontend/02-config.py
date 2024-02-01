@@ -36,7 +36,7 @@ plant:
 """
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ArrayConfig:
     """Array configuration item."""
 
@@ -275,14 +275,16 @@ class State:
         for key in State.pv_plants.value:
             if key == plant.name:
                 return
-        State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
+        State.pv_plants.set({**State.pv_plants.value, plant.name: plant})
 
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
-        array.name = f"Array {len(plant.arrays)}"
-        plant.arrays.append(array)
-        State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
+        array = dataclasses.replace(array, name=f"Array {len(plant.arrays)}")
+        plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
+        new_dict = dict(State.pv_plants.value)
+        new_dict[plant.name] = plant
+        State.pv_plants.set(new_dict)
 
     @staticmethod
     def on_delete_plant(plant: PVPlant) -> None:
@@ -298,8 +300,12 @@ class State:
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Delete an array from a plant."""
         try:
-            plant.arrays.remove(array)
-            State.pv_plants.set({plant.name: plant, **State.pv_plants.value})
+            new_arrays = list(plant.arrays)
+            new_arrays.remove(array)
+            plant = dataclasses.replace(plant, arrays=new_arrays)
+            new_dict = dict(State.pv_plants.value)
+            new_dict[plant.name] = plant
+            State.pv_plants.set(new_dict)
         except ValueError:
             pass
 
