@@ -72,7 +72,8 @@ def PVPlantEdit(
 
     def save() -> None:
         """Save the edited pv_plant."""
-        pv_plant.set(copy.value)
+        State.on_delete_plant(pv_plant.value)
+        State.on_new_plant(copy.value)
         on_close()
 
     with solara.Card("Edit", margin=0):
@@ -177,50 +178,6 @@ def ArrayListItem(
                     on_click=lambda: on_delete(pv_plant.value, array.value),
                     style={"flex-grow": "1"},
                 )
-
-
-@solara.component
-def ArrayEdit(
-    array: solara.Reactive[ArrayConfig],
-    on_delete: Callable[[], None],
-    on_close: Callable[[], None],
-) -> ValueElement:
-    """Take a reactive array and allows editing it.
-
-    Will not modify the original item until 'save' is clicked.
-    """
-    copy = solara.use_reactive(array.value)
-
-    def save() -> None:
-        """Save the edited array."""
-        array.set(copy.value)
-        on_close()
-
-    with solara.Card("Edit", margin=0):
-        solara.InputText(label="", value=Ref(copy.fields.name))
-        with solara.CardActions():
-            vue.Spacer()
-            solara.Button(
-                "Save",
-                icon_name="mdi-content-save",
-                on_click=save,
-                outlined=True,
-                name=True,
-            )
-            solara.Button(
-                "Close",
-                icon_name="mdi-window-close",
-                on_click=on_close,
-                outlined=True,
-                name=True,
-            )
-            solara.Button(
-                "Delete",
-                icon_name="mdi-delete",
-                on_click=on_delete,
-                outlined=True,
-                name=True,
-            )
 
 
 @solara.component
