@@ -116,7 +116,7 @@ def PVPlantListItem(
     edit, set_edit = solara.use_state(initial=False)
 
     # card
-    with solara.Card(f"🌻 PV plant: {pv_plant.value.name}"):
+    with solara.Card(f"🌻 {pv_plant.value.name}"):
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%"}):
                 with solara.Row():
@@ -191,7 +191,7 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
     """
     new_name, set_new_name = solara.use_state("")
     name_field = vue.TextField(
-        v_model=new_name, on_v_model=set_new_name, label="Enter a new PV plant name"
+        v_model=new_name, on_v_model=set_new_name, label="Enter a new plant name"
     )
 
     def create_new_item(*ignore_args) -> None:
@@ -225,6 +225,7 @@ class State:
     """State for the pvcast configuration page."""
 
     pv_plants: solara.Reactive[dict[str, PVPlant]] = solara.reactive({})
+    array_counter: solara.Reactive[int] = solara.reactive(0)
 
     @staticmethod
     def on_new_plant(plant: PVPlant) -> None:
@@ -237,7 +238,9 @@ class State:
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
-        array = dataclasses.replace(array, name=f"Array {len(plant.arrays)}")
+        # update array counter
+        State.array_counter.set(State.array_counter.value + 1)
+        array = dataclasses.replace(array, name=f"Array {State.array_counter.value}")
         plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
         new_dict = dict(State.pv_plants.value)
         new_dict[plant.name] = plant
@@ -278,15 +281,15 @@ def Page() -> ValueElement:
     """
     with solara.Column():
         solara.Title("Plant configuration")
-        solara.Info("On this page you can configure your PV plant(s).")
+        solara.Info("On this page you can configure your plant(s).")
         with solara.Columns([4, 7]):
             # active configuration
             with solara.Card():
                 solara.Title("Active configuration")
                 solara.Success(
-                    f"Number of configured PV plants: {len(State.pv_plants.value)}"
+                    f"Number of configured plants: {len(State.pv_plants.value)}"
                 )
-                solara.Markdown("## 🌱 PV plants")
+                solara.Markdown("## 🌱 Plants")
                 PVPlantNew(on_new=State.on_new_plant)
 
                 # list all plants
@@ -294,7 +297,7 @@ def Page() -> ValueElement:
                     not State.pv_plants.value
                 ):  # the reactive var is never false, but .value can be (when empty)
                     solara.Info(
-                        "No PV plants configured yet. Enter a PV plant name and hit enter."
+                        "No plants configured yet. Enter a plant name and hit enter."
                     )
                 else:
                     for _, plant_name in enumerate(State.pv_plants.value):
