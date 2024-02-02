@@ -26,6 +26,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.12"
 solara = "^1.25.1"
+polars-lts-cpu = "^0.20.6"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/Open-HEMS/pvcast-frontend/issues"

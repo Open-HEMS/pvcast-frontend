@@ -1240,6 +1240,43 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "polars-lts-cpu"
+version = "0.20.6"
+description = "Blazingly fast DataFrame library"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:6f1ed2a7ad13dd30aefb4b983dfcce0ed787c304d32585f651061e63b6d3ada6"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:20fafc5f9ea467718cf7b61184f1ca38816de4b9bf4a84b0c6dbe413ae5738c1"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c27275b4f9ddfb4d3f8d6df1cffa2285621fc008778ca4e0a6794cfaabf8a403"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:40454b8d904f5582f3ab1741e7842ad3de74005285277237148232b7c003b4cf"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-win_amd64.whl", hash = "sha256:1693aa7d59d17b49c7aa485c9a6d8a2006a9e2b6b03fbc5509e2bd8fb7acef2f"},
+    {file = "polars_lts_cpu-0.20.6.tar.gz", hash = "sha256:914d0e1ba51d7076e7b3156a0739b5111dd31a563ad0b11fa3ef3a1d3f21c59d"},
+]
+
+[package.extras]
+adbc = ["adbc_driver_sqlite"]
+all = ["polars[adbc,cloudpickle,connectorx,deltalake,fsspec,gevent,numpy,pandas,plot,pyarrow,pydantic,pyiceberg,sqlalchemy,timezone,xlsx2csv,xlsxwriter]"]
+cloudpickle = ["cloudpickle"]
+connectorx = ["connectorx (>=0.3.2)"]
+deltalake = ["deltalake (>=0.14.0)"]
+fsspec = ["fsspec"]
+gevent = ["gevent"]
+matplotlib = ["matplotlib"]
+numpy = ["numpy (>=1.16.0)"]
+openpyxl = ["openpyxl (>=3.0.0)"]
+pandas = ["pandas", "pyarrow (>=7.0.0)"]
+plot = ["hvplot (>=0.9.1)"]
+pyarrow = ["pyarrow (>=7.0.0)"]
+pydantic = ["pydantic"]
+pyiceberg = ["pyiceberg (>=0.5.0)"]
+pyxlsb = ["pyxlsb (>=1.0)"]
+sqlalchemy = ["pandas", "sqlalchemy"]
+timezone = ["backports.zoneinfo", "tzdata"]
+xlsx2csv = ["xlsx2csv (>=0.8.0)"]
+xlsxwriter = ["xlsxwriter"]
+
+[[package]]
 name = "pre-commit"
 version = "3.6.0"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
@@ -2482,4 +2519,4 @@ dev = ["doc8", "flake8", "flake8-import-order", "rstcheck[sphinx]", "sphinx"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "102325b8138606500fcbc4452175330a6c974a6eb61223f09c36c94511198bd2"
+content-hash = "7cea8a664cb77dab13d0ea0bf9efd1c2da07bb884e6960809bf0918577bd71d4"
