@@ -1,8 +1,10 @@
 """Configuration page for pvcast."""
 import dataclasses
 import logging
+from pathlib import Path
 from typing import Callable
 
+import polars as pl
 import reacton.ipyvuetify as vue
 import solara
 from reacton.core import ValueElement
@@ -35,6 +37,11 @@ plant:
   - name: South
 """
 
+# load cec_modules.csv
+BASE_PATH = Path(__file__).parent
+mod_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_modules.csv")
+inv_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_inverters.csv")
+
 
 @dataclasses.dataclass(frozen=True)
 class ArrayConfig:
@@ -56,6 +63,95 @@ class PVPlant:
     inverter: str = ""
     microinverter: bool = False
     arrays: list[ArrayConfig] = dataclasses.field(default_factory=list)
+
+
+@solara.component
+def ArrayEdit(
+    pv_plant: solara.Reactive[PVPlant],
+    array: solara.Reactive[ArrayConfig],
+    on_delete: Callable[[], None],
+    on_close: Callable[[], None],
+) -> ValueElement:
+    """Take a reactive array and allows editing it.
+
+    Will not modify the original item until 'save' is clicked.
+    """
+    copy = solara.use_reactive(array.value)
+    filter_v, set_filter = solara.use_state("")
+
+    def save() -> None:
+        """Save the edited array."""
+        print(f"copy: {copy.value}")
+        State.on_delete_array(pv_plant.value, array.value)
+        State.on_new_array(pv_plant.value, copy.value)
+        on_close()
+
+    with solara.Card("Edit", margin=0):
+        solara.InputText(label="", value=Ref(copy.fields.name))
+        solara.SliderInt(label="Tilt", value=Ref(copy.fields.tilt), max=90, min=0)
+        solara.SliderInt(label="Azimuth", value=Ref(copy.fields.azimuth), max=360, min=0)
+        solara.SliderInt(
+            label="Modules per string",
+            value=Ref(copy.fields.modules_per_string),
+            min=1,
+        )
+
+        solara.SliderInt(label="Strings", value=Ref(copy.fields.strings), min=1)
+
+
+        # module selection
+        found_modules = []
+        solara.InputText(
+            label="Filter modules by manufacturer / product code",
+            value=filter_v,
+            on_value=set_filter,
+            continuous_update=True,
+        )
+        if filter_v:
+            try:
+                found_modules = (
+                    mod_param.filter(pl.col("index").str.contains(f"(?i){filter_v}"))
+                    .select(pl.col("index"))
+                    .collect().to_series().to_list()
+                )
+            except Exception as e:
+                solara.Error(f"Error: {e}")
+                found_modules = []
+            if len(found_modules) == 0:
+                solara.Warning("No modules found, please adjust your search string.")
+            else:
+                solara.Info(f"Found {len(found_modules)} modules.")
+        else:
+            solara.Info(f"Found {len(found_modules)} modules.")
+
+        # module selection
+        solara.Select(label="Module", value=Ref(copy.fields.module), values=found_modules,
+                      on_value=lambda x: copy.set(dataclasses.replace(copy.value, module=x)))
+        solara.Success(f"Selected module: {copy.value.module}") if copy.value.module else solara.Warning("No module selected.")
+
+        with solara.CardActions():
+            vue.Spacer()
+            solara.Button(
+                "Save",
+                icon_name="mdi-content-save",
+                on_click=save,
+                outlined=True,
+                name=True,
+            )
+            solara.Button(
+                "Close",
+                icon_name="mdi-window-close",
+                on_click=on_close,
+                outlined=True,
+                name=True,
+            )
+            solara.Button(
+                "Delete",
+                icon_name="mdi-delete",
+                on_click=on_delete,
+                outlined=True,
+                name=True,
+            )
 
 
 @solara.component
@@ -167,17 +263,45 @@ def ArrayListItem(
     For demonstration purposes, we allow editing the item in a dialog as well.
     This will not modify the original item until 'save' is clicked.
     """
+    # edit button
+    edit, set_edit = solara.use_state(initial=False)
+
     with solara.Card(
         f"⚡ {array.value.name}", margin=0, style={"backgroud-color": "green"}
     ):
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%"}):
-                solara.Button(
-                    "DELETE ARRAY",
-                    icon_name="mdi-delete",
-                    on_click=lambda: on_delete(pv_plant.value, array.value),
-                    style={"flex-grow": "1"},
-                )
+                with solara.Row():
+                    solara.Button(
+                        "EDIT ARRAY",
+                        icon_name="mdi-pencil",
+                        on_click=lambda: set_edit(True),
+                        style={"flex-grow": "1", "width": "50%"},
+                        color="primary",
+                    )
+                    solara.Button(
+                        "DELETE ARRAY",
+                        icon_name="mdi-delete",
+                        on_click=lambda: on_delete(pv_plant.value, array.value),
+                        style={"flex-grow": "1", "width": "50%"},
+                        color="primary",
+                    )
+            with vue.Dialog(
+                v_model=edit, persistent=True, max_width="500px", on_v_model=set_edit
+            ):
+                if edit:
+
+                    def on_delete_in_edit() -> None:
+                        """Delete the item, and close the dialog."""
+                        on_delete(pv_plant.value)
+                        set_edit(False)
+
+                    ArrayEdit(
+                        pv_plant,
+                        array,
+                        on_delete=on_delete_in_edit,
+                        on_close=lambda: set_edit(False),
+                    )
 
 
 @solara.component
@@ -240,7 +364,10 @@ class State:
         """Add a new array to a plant."""
         # update array counter
         State.array_counter.set(State.array_counter.value + 1)
-        array = dataclasses.replace(array, name=f"Array {State.array_counter.value}")
+        if array.name == "":
+            array = dataclasses.replace(
+                array, name=f"Array {State.array_counter.value}"
+            )
         plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
         new_dict = dict(State.pv_plants.value)
         new_dict[plant.name] = plant
@@ -282,15 +409,16 @@ def Page() -> ValueElement:
     with solara.Column():
         solara.Title("Plant configuration")
         solara.Info("On this page you can configure your plant(s).")
-        with solara.Columns([4, 7]):
-            # active configuration
-            with solara.Card():
-                solara.Title("Active configuration")
-                solara.Success(
-                    f"Number of configured plants: {len(State.pv_plants.value)}"
-                )
-                solara.Markdown("## 🌱 Plants")
-                PVPlantNew(on_new=State.on_new_plant)
+        with solara.Columns([4, 5]):
+            with solara.Column():
+                # active configuration
+                with solara.Card():
+                    solara.Title("Active configuration")
+                    solara.Success(
+                        f"Number of configured plants: {len(State.pv_plants.value)}"
+                    )
+                    solara.Markdown("## 🌱 Plants")
+                    PVPlantNew(on_new=State.on_new_plant)
 
                 # list all plants
                 if (
