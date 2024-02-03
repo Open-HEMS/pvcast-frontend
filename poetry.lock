@@ -1240,6 +1240,124 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "polars"
+version = "0.20.6"
+description = "Blazingly fast DataFrame library"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "polars-0.20.6-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:59845bae0b614b3291baa889cfc2a251e1024129696bb655596f2b5556e9f9a1"},
+    {file = "polars-0.20.6-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:9e86736f68440bf97a9100fa0a79ae7ce616d1af6fd4669fff1345f03aab14c0"},
+    {file = "polars-0.20.6-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e4f4e3335fdcc863f6aac0616510b1baa5e13d5e818ebbfcb980ad534bd6edc2"},
+    {file = "polars-0.20.6-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:7c7b494beea914a54bcae8868dee3988a88ecb48525df948e07aacf2fb83e711"},
+    {file = "polars-0.20.6-cp38-abi3-win_amd64.whl", hash = "sha256:a96b157d68697c8d6ef2f7c2cc1734d498c3c6cc0c9c18d4fff7283ccfabdd1d"},
+    {file = "polars-0.20.6.tar.gz", hash = "sha256:b53553308bc7e2b4f841b18f1949b61ed7f2cf155c5c64712298efa5af67a997"},
+]
+
+[package.extras]
+adbc = ["adbc_driver_sqlite"]
+all = ["polars[adbc,cloudpickle,connectorx,deltalake,fsspec,gevent,numpy,pandas,plot,pyarrow,pydantic,pyiceberg,sqlalchemy,timezone,xlsx2csv,xlsxwriter]"]
+cloudpickle = ["cloudpickle"]
+connectorx = ["connectorx (>=0.3.2)"]
+deltalake = ["deltalake (>=0.14.0)"]
+fsspec = ["fsspec"]
+gevent = ["gevent"]
+matplotlib = ["matplotlib"]
+numpy = ["numpy (>=1.16.0)"]
+openpyxl = ["openpyxl (>=3.0.0)"]
+pandas = ["pandas", "pyarrow (>=7.0.0)"]
+plot = ["hvplot (>=0.9.1)"]
+pyarrow = ["pyarrow (>=7.0.0)"]
+pydantic = ["pydantic"]
+pyiceberg = ["pyiceberg (>=0.5.0)"]
+pyxlsb = ["pyxlsb (>=1.0)"]
+sqlalchemy = ["pandas", "sqlalchemy"]
+timezone = ["backports.zoneinfo", "tzdata"]
+xlsx2csv = ["xlsx2csv (>=0.8.0)"]
+xlsxwriter = ["xlsxwriter"]
+
+[[package]]
+name = "polars-distance"
+version = "0.4.0"
+description = "Polars plugin for pairwise distance functions"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "polars_distance-0.4.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:1a75642c9b93882c345f8797b6319fd39bfefc85cbdda550a22feb0d30969cb9"},
+    {file = "polars_distance-0.4.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:096925cb9d79dc4a4a1bb30ddd8311e4ae1cde7f0fb9513c780a2df2188d580d"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aa670bac1f4e09d844da6b38fb12525e29df7fd194d24f81006e10509efb8028"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:7d575dc0312b6ea5a648b58b8586e9a2a3b4a3ba06eab5556ff380f9d5c5be71"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3b6af25a2a82f2c3b18f2ae9e257beff3f65a4a3c942c3ffa17448095292a271"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:808d69b9d78e64ee857572eca655e0ad9c4ba38952f96826d5cf11cdb3ad800b"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b4e04e3e13d1a2670c1540e4360a57e142c8d2704ba0c1a7a9ad0752ec53b010"},
+    {file = "polars_distance-0.4.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:966e2e0f02fff19297fafa83040a05a95ccabda4a81fe5983a46fc7e73675ef0"},
+    {file = "polars_distance-0.4.0-cp310-none-win32.whl", hash = "sha256:09b38e1d2b31b89cb62f600d4eed10152c7add9f45dde1f3fca4c54898f44acf"},
+    {file = "polars_distance-0.4.0-cp310-none-win_amd64.whl", hash = "sha256:8b05f7eba5fcf6f2f9b20fa8634c9f10324395f9772488f475c2ebd9190c4d7b"},
+    {file = "polars_distance-0.4.0-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:141024713df378dc9d37db193ecc2bb79b34d3bf665c1c86fe4a9673ff139bfe"},
+    {file = "polars_distance-0.4.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:572684f043faac84536791d5dd8dd99d93ea434ca8b657e772cd237397dbafbb"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a5ff400d2cbbf341428511d312ed6c5fe82f4478dc70eba98db58aceb7105063"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:b3e27e77219f225e416ef3ae377a56058e9ba7bf59b69e3e02f7c95b5b46dd1d"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a8488e0b1b703faa1fe5cdef2cf63e2cc4ecc76e179aced44086dec025758570"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:b8ea3a126bd22f25fe651d0ca03748a91b53af6dce1acf5b5c124d4f54d8a3f0"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:9eb0be9ee4989b63f60a65123dfaad25530f27540bdd4f9326e3fb236d4a6c9b"},
+    {file = "polars_distance-0.4.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5e6d01ba018ff3cced9f63b6638150f55dffb507492cbd916f9ec861af69c89e"},
+    {file = "polars_distance-0.4.0-cp311-none-win32.whl", hash = "sha256:57ccec77c48e4c79345fc6b459679542b2a62e1bcf4e151283abf03f9573bed2"},
+    {file = "polars_distance-0.4.0-cp311-none-win_amd64.whl", hash = "sha256:e0cfab23b51b1a3b73455d339f0d6dce6f7bbf59a044ec580cfb30a67c849e1a"},
+    {file = "polars_distance-0.4.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:aaabb7b0402fa4d66c62389b00a52772c656977a9a1107a0b474bcf78be5cc05"},
+    {file = "polars_distance-0.4.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:e3033cc22b06f25a1223d618ca866959d7522148b50eb9097e7051914d4ffcae"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d53e2111589a02cd50e24f23afddfafe1e305a55cbf11608e93021f77f5ffe84"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:657b5569c6ec85ee35eae42f49f06e394eac83454504e34435d1caa87566efc9"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7787f04f516de23a7025d2f46107de958d64cc2559dd56cdba23fbf761fa18b5"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:f5cb76758279c780d0a807197f007497732e5119fd611d48a6758dbde4d7bdf6"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:f9439c685d9dbcf75cd68013c1a7bb00e98a010790758e68131fe2666c1c023a"},
+    {file = "polars_distance-0.4.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8cb41cb79651ed678647002cbb5bdfac4b5cfaad3157be407ef7921839129e46"},
+    {file = "polars_distance-0.4.0-cp312-none-win32.whl", hash = "sha256:7baaa89bc0797eafef502b6bbe1abba6a90b2708cda31d0f0eaffd3ad1443558"},
+    {file = "polars_distance-0.4.0-cp312-none-win_amd64.whl", hash = "sha256:d0da98c8ed9ae9e28402d130ee2f42f94b741c42404192946ee1cf0c5d6420bb"},
+    {file = "polars_distance-0.4.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:eb5c1e7b65d2b30080742c1def64a2cc1d245f63e7916d51cfb1708fcef21400"},
+    {file = "polars_distance-0.4.0-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:4fe49361e96ef731d6108929fcb6c75e8c30a9392f2b48ea7dc399982eff5adc"},
+    {file = "polars_distance-0.4.0-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:93dffd637f9e3c81c091524667ebb21c9cd3d781c84ef754f9007781ae5d688e"},
+    {file = "polars_distance-0.4.0-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:4c4a8641877ce371d152a134e9cf193967a45e86d2b177d13110110addb7e778"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8f159fd022df4b5923c4b9ec6f09d2df6270e7f00640122fa24c33101139e8aa"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:6915321ff27d52619ef71c4538b9d7125defe477050c848569e00d4a0a489ce6"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9ad2941846ff3a3b5ccc5cdac42e9b6f2246b2835e3211755416b5813eb2c13f"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:f6e96e5ed8f816cc84917ab6c415d80bb495d9e2fbb1392e1d3a66226ee82357"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:60fbc484b8ee15a9f26cc05d8c77dc1be76d48903c92698982e0e9acd82bbc96"},
+    {file = "polars_distance-0.4.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f3008e42e4718c6ea02cfff0510ba96e3d88e746e4f21427438c999476da6a4e"},
+    {file = "polars_distance-0.4.0-cp38-none-win32.whl", hash = "sha256:0e6e0f6a5127fa28b410f5d02acabf16adffba95667025fd2fc341ccb9e1b18f"},
+    {file = "polars_distance-0.4.0-cp38-none-win_amd64.whl", hash = "sha256:c0aa6634d5add974a6fa339975212979d0093ffbe70713f304b286081e096388"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3e6856291d6d1dae233d2eae2d12ddf52526cb583add6933117390257833ca1e"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:d1308d1c1fe05f15fa781997de2322d534331b03e1c31aaa1e1c771baf7dcb33"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:74c1b018a451f38ae4268a26867311987f06bafe208ad3f083a8a63b1dbcbd43"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0ceefd7318077bdd0a8d84603b66a2ca92fc7518d5c1b1e82217ec1e8097318a"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:a069b9ea3b23192b50988525337f49c2e831d89203457d4a8cec9d9fbf5fecde"},
+    {file = "polars_distance-0.4.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a579944b99cd077bf293f8aa83a0f26db20893245c40b0db861c0921bd20d8de"},
+    {file = "polars_distance-0.4.0-cp39-none-win32.whl", hash = "sha256:260ef1c39c3334a2571494b56b9129b07493deefc7663022eafd991e60276c72"},
+    {file = "polars_distance-0.4.0-cp39-none-win_amd64.whl", hash = "sha256:cb11439316a2f12e9ab81a1eb45962e806eec9e42d1235a07050c8edf315e408"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0efbdc6b21ecb67d016c6701cf953bc12892d1fd52d3b85ef8858704cc94712a"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:4bd5e39ec2e4881b18f629e6c20b04c8b07baa648b501a2090d77d40afccee6f"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:8fc184b406f2f92aa27fca468ee831e3b2a088c516b40598799d37c49328ea14"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:3df112d19705deb546cca309bfbac711281983094746b63d1e76c7836e43409d"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:9abafea9afb8ec1720ab26c874503e3ec93280d24bcb5ea236e676bccffa4334"},
+    {file = "polars_distance-0.4.0-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ec53959ea8cb7f316e93ca8fd4ea42db663627ea07969fff2850a5f0114d8150"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:bfc08c52d413c9a6d9cad0f11b48bad1dd7dfd79eeae5675d69a3dd0e527d303"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:7086486d6632559fff4454a2dbec41ccfd787575b4ef099c6f2555ef5dbe452d"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:b3673ebef2cbbc247ab40c1d17ab6a0ec308526762ad1b831a90a4e1eb241c88"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:82f69ab125bf6a04401df5f97e22a25e6eadaacd3daae8d5c76e0ef99a352b61"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:a10e66e25f2eafb05d30ccf4960d6742a0aca17a8ea64dc90fdfd2010b7027c7"},
+    {file = "polars_distance-0.4.0-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9f34203885e45814e5b2f6f97a8321da14dae18c19b28bd0d7d2e81b0c67c8ed"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:042d5d1c6d9911577bbffe050eb563b7721856279c6d048cfb49ad2d669bb2e1"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:2aa0d49ccd00b282719919eef75eec4a569f5a7635c53e163c220901a762877d"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c1141423801b11a956fbcf7df19e659c4ccaef572d0a32025fd4eff53deb78a9"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:f4f8602ded7764fe3f61c9d2ee07bcea581768577808e6babf2daf66d21d8f4f"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:164d1e607df55c9abda7e31e259263d6190b8bb768140c964b7fc589cbd841a6"},
+    {file = "polars_distance-0.4.0-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6928d87fb5d913281d0708157a4ec307ff2785d964657c2ad7d748887397863a"},
+    {file = "polars_distance-0.4.0.tar.gz", hash = "sha256:d84878fd2db8df80a77cdb676ca3f0478d133e43e6bfc978fa7618fad93201bd"},
+]
+
+[package.dependencies]
+polars = ">=0.20.6"
+
+[[package]]
 name = "polars-lts-cpu"
 version = "0.20.6"
 description = "Blazingly fast DataFrame library"
@@ -2519,4 +2637,4 @@ dev = ["doc8", "flake8", "flake8-import-order", "rstcheck[sphinx]", "sphinx"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "7cea8a664cb77dab13d0ea0bf9efd1c2da07bb884e6960809bf0918577bd71d4"
+content-hash = "930eb61d53d122b67340e98c156737028741899344f2315e721c922fe2469584"
