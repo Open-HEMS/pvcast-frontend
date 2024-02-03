@@ -2,13 +2,15 @@
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import polars as pl
 import reacton.ipyvuetify as vue
 import solara
 from reacton.core import ValueElement
 from solara.lab.toestand import Ref
+
+MAX_LEN_SLIDER = 40
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
@@ -37,8 +39,12 @@ plant:
   - name: South
 """
 
-# load cec_modules.csv
 BASE_PATH = Path(__file__).parent
+
+# CSS
+sliders_css = BASE_PATH / "data/CSS/sliders.css"
+
+# load cec_modules.csv
 mod_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_modules.csv")
 inv_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_inverters.csv")
 
@@ -65,6 +71,35 @@ class PVPlant:
     arrays: list[ArrayConfig] = dataclasses.field(default_factory=list)
 
 
+def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
+    """Filter the list for the given query.
+
+    :param input_data: the input data to filter
+    :param query: the query to filter the data with
+    :return: a list of items that match the query
+    """
+    try:
+        found = (
+            input_data.filter(pl.col("index").str.contains(f"(?i){query}"))
+            .select(pl.col("index"))
+            .collect()
+            .to_series()
+            .to_list()
+        )
+    except pl.ComputeError as exc:
+        solara.Error(f"Error: {exc}")
+        found = []
+    return found
+
+@solara.component
+def SliderRow(
+    label: str, value: solara.Reactive[int], min_val: int, max_val: int, postfix: str = ""
+) -> ValueElement:
+    """Create a row with a slider and a value display."""
+    with solara.Row():
+        solara.SliderInt(label=label, value=value, min=min_val, max=max_val)
+        solara.Info(f"{value.value}" + postfix, dense=True, icon=False)
+
 @solara.component
 def ArrayEdit(
     pv_plant: solara.Reactive[PVPlant],
@@ -78,56 +113,74 @@ def ArrayEdit(
     """
     copy = solara.use_reactive(array.value)
     filter_v, set_filter = solara.use_state("")
+    found_modules, set_modules = solara.use_state([])
 
     def save() -> None:
         """Save the edited array."""
-        print(f"copy: {copy.value}")
         State.on_delete_array(pv_plant.value, array.value)
         State.on_new_array(pv_plant.value, copy.value)
         on_close()
 
-    with solara.Card("Edit", margin=0):
+    with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
         solara.InputText(label="", value=Ref(copy.fields.name))
-        solara.SliderInt(label="Tilt", value=Ref(copy.fields.tilt), max=90, min=0)
-        solara.SliderInt(label="Azimuth", value=Ref(copy.fields.azimuth), max=360, min=0)
-        solara.SliderInt(
+        solara.Style(sliders_css)
+
+        # panel tilt
+        SliderRow(
+            label="Tilt",
+            value=Ref(copy.fields.tilt),
+            min_val=0,
+            max_val=90,
+            postfix="°",
+        )
+
+        # panel azimuth
+        SliderRow(
+            label="Azimuth",
+            value=Ref(copy.fields.azimuth),
+            min_val=0,
+            max_val=360,
+            postfix="°",
+        )
+
+        # modules per string
+        SliderRow(
             label="Modules per string",
             value=Ref(copy.fields.modules_per_string),
-            min=1,
+            min_val=1,
+            max_val=20,
         )
 
-        solara.SliderInt(label="Strings", value=Ref(copy.fields.strings), min=1)
-
-
-        # module selection
-        found_modules = []
-        solara.InputText(
-            label="Filter modules by manufacturer / product code",
-            value=filter_v,
-            on_value=set_filter,
-            continuous_update=True,
+        # strings per inverter
+        SliderRow(
+            label="Strings per inverter",
+            value=Ref(copy.fields.strings),
+            min_val=1,
+            max_val=20,
         )
+
+        def input_hook(*args: str) -> None:
+            """Input field hook."""
+            query = args[-1]
+            set_modules(filter_list(input_data=mod_param, query=query))
+
+        module = vue.Autocomplete(
+            label="Start typing to filter modules by name",
+            filled=True,
+            v_model=filter_v,
+            items=found_modules,
+            on_v_model=set_filter,
+            style={"width": "100%"},
+        )
+        vue.use_event(module, "update:search-input", input_hook)
+
+        # write the selected module to the array
         if filter_v:
-            try:
-                found_modules = (
-                    mod_param.filter(pl.col("index").str.contains(f"(?i){filter_v}"))
-                    .select(pl.col("index"))
-                    .collect().to_series().to_list()
-                )
-            except Exception as e:
-                solara.Error(f"Error: {e}")
-                found_modules = []
-            if len(found_modules) == 0:
-                solara.Warning("No modules found, please adjust your search string.")
-            else:
-                solara.Info(f"Found {len(found_modules)} modules.")
-        else:
-            solara.Info(f"Found {len(found_modules)} modules.")
+            copy.value = dataclasses.replace(copy.value, module=filter_v)
 
-        # module selection
-        solara.Select(label="Module", value=Ref(copy.fields.module), values=found_modules,
-                      on_value=lambda x: copy.set(dataclasses.replace(copy.value, module=x)))
-        solara.Success(f"Selected module: {copy.value.module}") if copy.value.module else solara.Warning("No module selected.")
+        solara.Success(
+            f"Selected module: {copy.value.module}"
+        ) if copy.value.module else solara.Warning("No module selected.")
 
         with solara.CardActions():
             vue.Spacer()
@@ -293,7 +346,7 @@ def ArrayListItem(
 
                     def on_delete_in_edit() -> None:
                         """Delete the item, and close the dialog."""
-                        on_delete(pv_plant.value)
+                        on_delete(pv_plant.value, array.value)
                         set_edit(False)
 
                     ArrayEdit(

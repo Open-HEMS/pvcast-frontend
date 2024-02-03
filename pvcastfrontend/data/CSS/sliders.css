@@ -1,0 +1,12 @@
+.v-application--is-ltr .v-input__slider .v-input__slot .v-label {
+    margin-left: 0;
+    margin-right: 12px;
+    width: 35%;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.v-alert.v-sheet.theme--light.v-alert--dense.v-alert--outlined.v-alert--text.info--text {
+    min-width: 10%;
+    padding: 5px 5px 5px 5px;
+}
