@@ -71,16 +71,18 @@ class PVPlant:
     microinverter: bool = False
     arrays: list[ArrayConfig] = dataclasses.field(default_factory=list)
 
+
 def generate_regex_pattern(input_string: str) -> str:
     """Generate a regex pattern from a string.
 
     A string could be "Yes no maybe" and the pattern would become:
-    ((yes).*(no).*(maybe)) | ((yes).*(maybe).*(no)) | ((no).*(yes).*(maybe)) | ... etc
+    ((yes).*(no).*(maybe))|((yes).*(maybe).*(no))|((no).*(yes).*(maybe))|... etc
 
     :param input_string: the input string to generate the pattern from
     :return: the generated pattern as a string
     """
     words = input_string.split()
+    words = filter(lambda x: len(x) > 0, words)
     word_permutations = itertools.permutations(words)
     patterns = []
 
@@ -90,6 +92,7 @@ def generate_regex_pattern(input_string: str) -> str:
 
     return "|".join(patterns)
 
+
 def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
     """Filter the list for the given query.
 
@@ -98,9 +101,12 @@ def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
     :return: a list of items that match the query
     """
     try:
-        regex = generate_regex_pattern(query)
-        found = (
-            input_data.filter(pl.col("index").str.contains(regex))
+        if len(query) == 0:
+            return input_data.select(pl.col("index")).collect().to_series().to_list()
+        return (
+            input_data.filter(
+                pl.col("index").str.contains(generate_regex_pattern(query))
+            )
             .select(pl.col("index"))
             .collect()
             .to_series()
@@ -108,17 +114,22 @@ def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
         )
     except pl.ComputeError as exc:
         solara.Error(f"Error: {exc}")
-        found = []
-    return found
+        return []
+
 
 @solara.component
 def SliderRow(
-    label: str, value: solara.Reactive[int], min_val: int, max_val: int, postfix: str = ""
+    label: str,
+    value: solara.Reactive[int],
+    min_val: int,
+    max_val: int,
+    postfix: str = "",
 ) -> ValueElement:
     """Create a row with a slider and a value display."""
     with solara.Row():
         solara.SliderInt(label=label, value=value, min=min_val, max=max_val)
         solara.Info(f"{value.value}" + postfix, dense=True, icon=False)
+
 
 @solara.component
 def ArrayEdit(
@@ -182,9 +193,7 @@ def ArrayEdit(
         def input_hook(*args: str) -> None:
             """Input field hook."""
             query = args[-1]
-            modules = []
-            if len(query) > 0:
-                modules = filter_list(input_data=mod_param, query=query)
+            modules = filter_list(input_data=mod_param, query=query)
             set_modules(modules)
 
         module = vue.Autocomplete(
@@ -392,7 +401,9 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
     """
     new_name, set_new_name = solara.use_state("")
     name_field = vue.TextField(
-        v_model=new_name, on_v_model=set_new_name, label="Enter a new plant name"
+        v_model=new_name,
+        on_v_model=set_new_name,
+        label="Enter a new plant name and press enter to add it to the list.",
     )
 
     def create_new_item(*ignore_args) -> None:
@@ -458,7 +469,7 @@ class State:
             new_dict.pop(plant.name)
             State.pv_plants.set(new_dict)
         except KeyError:
-            pass
+            _LOGGER.exception("Plant %s not found in plant list.", plant.name)
 
     @staticmethod
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
