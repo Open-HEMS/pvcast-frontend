@@ -1,5 +1,6 @@
 """Configuration page for pvcast."""
 import dataclasses
+import itertools
 import logging
 from pathlib import Path
 from typing import Any, Callable
@@ -70,6 +71,24 @@ class PVPlant:
     microinverter: bool = False
     arrays: list[ArrayConfig] = dataclasses.field(default_factory=list)
 
+def generate_regex_pattern(input_string: str) -> str:
+    """Generate a regex pattern from a string.
+
+    A string could be "Yes no maybe" and the pattern would become:
+    ((yes).*(no).*(maybe)) | ((yes).*(maybe).*(no)) | ((no).*(yes).*(maybe)) | ... etc
+
+    :param input_string: the input string to generate the pattern from
+    :return: the generated pattern as a string
+    """
+    words = input_string.split()
+    word_permutations = itertools.permutations(words)
+    patterns = []
+
+    for perm in word_permutations:
+        pattern_part = ".*".join(f"(?i)({word})" for word in perm)
+        patterns.append(f"({pattern_part})")
+
+    return "|".join(patterns)
 
 def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
     """Filter the list for the given query.
@@ -79,8 +98,9 @@ def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
     :return: a list of items that match the query
     """
     try:
+        regex = generate_regex_pattern(query)
         found = (
-            input_data.filter(pl.col("index").str.contains(f"(?i){query}"))
+            input_data.filter(pl.col("index").str.contains(regex))
             .select(pl.col("index"))
             .collect()
             .to_series()
@@ -162,7 +182,10 @@ def ArrayEdit(
         def input_hook(*args: str) -> None:
             """Input field hook."""
             query = args[-1]
-            set_modules(filter_list(input_data=mod_param, query=query))
+            modules = []
+            if len(query) > 0:
+                modules = filter_list(input_data=mod_param, query=query)
+            set_modules(modules)
 
         module = vue.Autocomplete(
             label="Start typing to filter modules by name",
@@ -171,6 +194,7 @@ def ArrayEdit(
             items=found_modules,
             on_v_model=set_filter,
             style={"width": "100%"},
+            no_filter=True,
         )
         vue.use_event(module, "update:search-input", input_hook)
 
