@@ -290,8 +290,8 @@ def PVPlantEdit(
 
     def save() -> None:
         """Save the edited pv_plant."""
-        State.on_delete_plant(pv_plant.value)
         State.on_new_plant(copy.value)
+        State.on_delete_plant(pv_plant.value)
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
@@ -342,7 +342,7 @@ def PVPlantListItem(
     # card
     with solara.Card(f"🌻 {pv_plant.value.name}"):
         with solara.v.ListItem():
-            with solara.Column(style={"width": "100%"}):
+            with solara.Column(style={"width": "100%", "margin": "auto"}):
                 with solara.Row():
                     solara.Button(
                         "EDIT PLANT",
@@ -398,7 +398,7 @@ def ArrayListItem(
         f"⚡ {array.value.name}", margin=0, style={"backgroud-color": "green"}
     ):
         with solara.v.ListItem():
-            with solara.Column(style={"width": "100%"}):
+            with solara.Column(style={"width": "100%", "margin": "auto"}):
                 with solara.Row():
                     solara.Button(
                         "EDIT ARRAY",
@@ -479,7 +479,6 @@ class State:
     """State for the pvcast configuration page."""
 
     pv_plants: solara.Reactive[dict[str, PVPlant]] = solara.reactive({})
-    array_counter: solara.Reactive[int] = solara.reactive(0)
 
     @staticmethod
     def on_new_plant(plant: PVPlant) -> None:
@@ -492,12 +491,14 @@ class State:
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
-        # update array counter
-        State.array_counter.set(State.array_counter.value + 1)
         if array.name == "":
-            array = dataclasses.replace(
-                array, name=f"Array {State.array_counter.value}"
-            )
+            arr_names = [arr.name for arr in plant.arrays]
+            count = 1
+            name = f"Array {count}"
+            while name in arr_names:
+                count += 1
+                name = f"Array {count}"
+            array = dataclasses.replace(array, name=name)
         plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
         new_dict = dict(State.pv_plants.value)
         new_dict[plant.name] = plant
@@ -545,6 +546,8 @@ def Page() -> ValueElement:
     It will consist of two columns, one for the active configuration we are editing,
     and one for the current field we are modifying.
     """
+    file_missing, set_file_missing = solara.use_state(initial=False)
+    save_success, set_save_success = solara.use_state(initial=False)
 
     def on_save() -> None:
         """Save the configuration."""
@@ -564,13 +567,39 @@ def Page() -> ValueElement:
             with Path.open(CONFIG_FILE_PATH, "w+") as file:
                 yaml.dump(config, file, default_flow_style=False)
 
+        # generate a snack bar message
+        set_save_success(True)
+
+    def on_load() -> None:
+        """Load the configuration."""
+        set_file_missing(False)
+
+        if Path.exists(CONFIG_FILE_PATH):
+            with Path.open(CONFIG_FILE_PATH, "r") as file:
+                config = yaml.safe_load(file)
+                State.pv_plants.set(
+                    {
+                        plant["name"]: PVPlant(
+                            name=plant["name"],
+                            inverter=plant["inverter"],
+                            microinverter=plant["microinverter"],
+                            arrays=[ArrayConfig(**array) for array in plant["arrays"]],
+                        )
+                        for plant in config["plant"]
+                    }
+                )
+        else:
+            set_file_missing(True)
+
+
     with solara.Column():
         solara.Title("Plant configuration")
         solara.Info("On this page you can configure your plant(s).")
         with solara.Columns([4, 5]):
             with solara.Column():
+
                 # active configuration
-                with solara.Card():
+                with solara.Card(style={"margin": "auto"}):
                     solara.Title("Active configuration")
                     solara.Success(
                         f"Number of configured plants: {len(State.pv_plants.value)}"
@@ -579,13 +608,45 @@ def Page() -> ValueElement:
                     PVPlantNew(on_new=State.on_new_plant)
 
                     # save plant config as YAML file
-                    solara.Button(
-                        "Save configuration",
-                        icon_name="mdi-content-save",
-                        on_click=on_save,
-                        outlined=True,
-                        name=True,
+                    with solara.Row(style={"width": "100%", "margin": "auto"}):
+                        solara.Button(
+                            "Save config",
+                            icon_name="mdi-content-save",
+                            on_click=on_save,
+                            outlined=True,
+                            name=True,
+                            style={"flex-grow": "1"},
+                        )
+
+                        # load plant config from YAML file
+                        solara.Button(
+                            "Load config",
+                            icon_name="mdi-file-upload",
+                            on_click=on_load,
+                            outlined=True,
+                            name=True,
+                            style={"flex-grow": "1"},
+                        )
+
+                    # show a snack bar if the file does not exist
+                    snack_file = vue.Snackbar(
+                        v_model=file_missing,
+                        timeout=3000,
+                        color="error",
+                        children=[f"No configuration file found at {CONFIG_FILE_PATH}."],
+                        on_v_model=set_file_missing,
                     )
+                    solara.display(snack_file)
+
+                    # show a snack bar if the file was saved successfully
+                    snack_save = vue.Snackbar(
+                        v_model=save_success,
+                        timeout=3000,
+                        color="success",
+                        children=[f"Configuration saved successfully to {CONFIG_FILE_PATH}."],
+                        on_v_model=set_save_success,
+                    )
+                    solara.display(snack_save)
 
                 # list all plants
                 if (

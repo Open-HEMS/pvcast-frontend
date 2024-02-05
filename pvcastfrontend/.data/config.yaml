@@ -1,17 +1,5 @@
 plant:
-- arrays:
-  - azimuth: 180
-    module: ''
-    modules_per_string: 1
-    name: Array 1
-    strings: 1
-    tilt: 30
-  - azimuth: 180
-    module: ''
-    modules_per_string: 1
-    name: Array 2
-    strings: 1
-    tilt: 30
-  inverter: ''
+- arrays: []
+  inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
   microinverter: false
-  name: test
+  name: test123
