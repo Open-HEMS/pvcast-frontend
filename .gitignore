@@ -132,4 +132,4 @@ dmypy.json
 .vscode/
 
 # data
-pvcastfrontend/data/proc/*
+pvcastfrontend/.data/proc/*

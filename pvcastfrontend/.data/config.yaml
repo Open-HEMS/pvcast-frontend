@@ -1,0 +1,17 @@
+plant:
+- arrays:
+  - azimuth: 180
+    module: ''
+    modules_per_string: 1
+    name: Array 1
+    strings: 1
+    tilt: 30
+  - azimuth: 180
+    module: ''
+    modules_per_string: 1
+    name: Array 2
+    strings: 1
+    tilt: 30
+  inverter: ''
+  microinverter: false
+  name: test

@@ -2,12 +2,14 @@
 import dataclasses
 import itertools
 import logging
+import os
 from pathlib import Path
 from typing import Any, Callable
 
 import polars as pl
 import reacton.ipyvuetify as vue
 import solara
+import yaml
 from reacton.core import ValueElement
 from solara.lab.toestand import Ref
 
@@ -43,11 +45,15 @@ plant:
 BASE_PATH = Path(__file__).parent
 
 # CSS
-sliders_css = BASE_PATH / "data/CSS/sliders.css"
+sliders_css = BASE_PATH / ".data/CSS/sliders.css"
 
-# load cec_modules.csv
-mod_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_modules.csv")
-inv_param: pl.LazyFrame = pl.scan_csv(BASE_PATH / "data/proc/cec_inverters.csv")
+# config.yaml file path
+CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", BASE_PATH / ".data/config.yaml")
+
+# component parameter paths
+COMPONENT_PATH = os.environ.get("COMPONENT_PATH", BASE_PATH / ".data/proc")
+mod_param: pl.LazyFrame = pl.scan_csv(COMPONENT_PATH / "cec_modules.csv")
+inv_param: pl.LazyFrame = pl.scan_csv(COMPONENT_PATH / "cec_inverters.csv")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -132,6 +138,58 @@ def SliderRow(
 
 
 @solara.component
+def PVComponentSelect(
+    copy: solara.Reactive[dataclasses.dataclass],
+    component_list: pl.LazyFrame,
+    field: str,
+) -> ValueElement:
+    """Select a PV component from a given list."""
+    filter_v, set_filter = solara.use_state("")
+    found_components, set_components = solara.use_state([])
+
+    def input_hook(*args: str) -> None:
+        """Input field hook."""
+        query = args[-1]
+        set_components(filter_list(input_data=component_list, query=query))
+
+    # create the autocomplete component to select the component
+    component = vue.Autocomplete(
+        label=f"Start typing to filter {field}s by name",
+        filled=True,
+        v_model=filter_v,
+        items=found_components,
+        on_v_model=set_filter,
+        style={"width": "100%"},
+        dense=False,
+        clearable=True,
+        no_filter=True,
+        auto_select_first=True,
+        loading=len(found_components) == 0,
+        no_data_text=f"No matching {field}s found",
+    )
+    vue.use_event(component, "update:search-input", input_hook)
+
+    # snackbar message
+    snack = vue.Snackbar(
+        v_model=filter_v,
+        timeout=3000,
+        color="success",
+        children=[f"Selected {field}: {copy.value.__getattribute__(field)}"],
+    )
+    solara.display(snack)
+
+    # write the selected module to the array
+    if filter_v:
+        copy.value = dataclasses.replace(copy.value, **{field: filter_v})
+
+    solara.Success(
+        f"Selected {field}: {copy.value.__getattribute__(field)}"
+    ) if copy.value.__getattribute__(field) else solara.Warning(
+        f"No {field} selected yet."
+    )
+
+
+@solara.component
 def ArrayEdit(
     pv_plant: solara.Reactive[PVPlant],
     array: solara.Reactive[ArrayConfig],
@@ -143,8 +201,6 @@ def ArrayEdit(
     Will not modify the original item until 'save' is clicked.
     """
     copy = solara.use_reactive(array.value)
-    filter_v, set_filter = solara.use_state("")
-    found_modules, set_modules = solara.use_state([])
 
     def save() -> None:
         """Save the edited array."""
@@ -153,7 +209,9 @@ def ArrayEdit(
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
-        solara.InputText(label="", value=Ref(copy.fields.name))
+        solara.InputText(
+            label="Modify the array name here", value=Ref(copy.fields.name)
+        )
         solara.Style(sliders_css)
 
         # panel tilt
@@ -190,30 +248,8 @@ def ArrayEdit(
             max_val=20,
         )
 
-        def input_hook(*args: str) -> None:
-            """Input field hook."""
-            query = args[-1]
-            modules = filter_list(input_data=mod_param, query=query)
-            set_modules(modules)
-
-        module = vue.Autocomplete(
-            label="Start typing to filter modules by name",
-            filled=True,
-            v_model=filter_v,
-            items=found_modules,
-            on_v_model=set_filter,
-            style={"width": "100%"},
-            no_filter=True,
-        )
-        vue.use_event(module, "update:search-input", input_hook)
-
-        # write the selected module to the array
-        if filter_v:
-            copy.value = dataclasses.replace(copy.value, module=filter_v)
-
-        solara.Success(
-            f"Selected module: {copy.value.module}"
-        ) if copy.value.module else solara.Warning("No module selected.")
+        # select module
+        PVComponentSelect(copy, mod_param, "module")
 
         with solara.CardActions():
             vue.Spacer()
@@ -258,8 +294,14 @@ def PVPlantEdit(
         State.on_new_plant(copy.value)
         on_close()
 
-    with solara.Card("Edit", margin=0):
-        solara.InputText(label="", value=Ref(copy.fields.name))
+    with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
+        solara.InputText(
+            label="Modify the plant name here", value=Ref(copy.fields.name)
+        )
+
+        # select inverter
+        PVComponentSelect(copy, inv_param, "inverter")
+
         with solara.CardActions():
             vue.Spacer()
             solara.Button(
@@ -484,6 +526,15 @@ class State:
         except ValueError:
             pass
 
+    # represent the class content as a dictionary
+    @staticmethod
+    def as_dict() -> str:
+        """Return the class content as a dictionary."""
+        plant_dict = {"plant": []}
+        for plant in State.pv_plants.value.values():
+            plant_dict["plant"].append(dataclasses.asdict(plant))
+        return plant_dict
+
 
 @solara.component
 def Page() -> ValueElement:
@@ -494,6 +545,25 @@ def Page() -> ValueElement:
     It will consist of two columns, one for the active configuration we are editing,
     and one for the current field we are modifying.
     """
+
+    def on_save() -> None:
+        """Save the configuration."""
+        if not Path.exists(CONFIG_FILE_PATH):
+            # create the file if it does not exist
+            with Path.open(CONFIG_FILE_PATH, "w+") as file:
+                yaml.dump(State.as_dict(), file, default_flow_style=False)
+
+        else:
+            # update the file
+            config: dict[str, Any] = {}
+            with Path.open(CONFIG_FILE_PATH, "r") as file:
+                if config := yaml.safe_load(file):
+                    config.update(State.as_dict())
+                else:
+                    config = State.as_dict()
+            with Path.open(CONFIG_FILE_PATH, "w+") as file:
+                yaml.dump(config, file, default_flow_style=False)
+
     with solara.Column():
         solara.Title("Plant configuration")
         solara.Info("On this page you can configure your plant(s).")
@@ -507,6 +577,15 @@ def Page() -> ValueElement:
                     )
                     solara.Markdown("## 🌱 Plants")
                     PVPlantNew(on_new=State.on_new_plant)
+
+                    # save plant config as YAML file
+                    solara.Button(
+                        "Save configuration",
+                        icon_name="mdi-content-save",
+                        on_click=on_save,
+                        outlined=True,
+                        name=True,
+                    )
 
                 # list all plants
                 if (
