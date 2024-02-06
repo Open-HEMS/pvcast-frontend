@@ -14,9 +14,23 @@ from reacton.core import ValueElement
 from solara.lab.toestand import Ref
 
 MAX_LEN_SLIDER = 40
+SNACKBACK_TIMEOUT = 6000
+
+# set the logging format
+LOG_FORMAT = "%(asctime)s [%(levelname)8s] %(message)s (%(name)s:%(lineno)s)"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format=LOG_FORMAT,
+    datefmt=DATE_FORMAT,
+    force=True
+)
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
+
+
 
 """
 # create a flexible PV plant configuration system, following the config system of pvcast:
@@ -172,7 +186,7 @@ def PVComponentSelect(
     # snackbar message
     snack = vue.Snackbar(
         v_model=filter_v,
-        timeout=3000,
+        timeout=SNACKBACK_TIMEOUT,
         color="success",
         children=[f"Selected {field}: {copy.value.__getattribute__(field)}"],
     )
@@ -204,9 +218,10 @@ def ArrayEdit(
 
     def save() -> None:
         """Save the edited array."""
-        State.on_delete_array(pv_plant.value, array.value)
         State.on_new_array(pv_plant.value, copy.value)
+        State.on_delete_array(pv_plant.value, array.value)
         on_close()
+
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
         solara.InputText(
@@ -291,7 +306,9 @@ def PVPlantEdit(
     def save() -> None:
         """Save the edited pv_plant."""
         State.on_new_plant(copy.value)
-        State.on_delete_plant(pv_plant.value)
+        # if the name has changed, delete the old plant
+        if pv_plant.value.name != copy.value.name:
+            State.on_delete_plant(pv_plant.value)
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
@@ -358,9 +375,10 @@ def PVPlantListItem(
                     )
 
                 # list all arrays for this plant
-                for index in range(len(pv_plant.value.arrays)):
-                    array = Ref(pv_plant.fields.arrays[index])
-                    ArrayListItem(pv_plant, array, on_delete=State.on_delete_array)
+                if pv_plant.value.arrays:
+                    for index in range(len(pv_plant.value.arrays)):
+                        array = Ref(pv_plant.fields.arrays[index])
+                        ArrayListItem(pv_plant, array, on_delete=State.on_delete_array)
                 ArrayNew(on_new=State.on_new_array, plant=pv_plant)
 
             with vue.Dialog(
@@ -449,12 +467,12 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
     )
 
     def create_new_item(*ignore_args) -> None:
-        """Create a new item, and reset the name field."""
+        """Create a new item, and reset the name enter field."""
         if not new_name:
             return
         new_item = PVPlant(name=new_name)
         on_new(new_item)
-        # reset name
+        # reset name enter field
         set_new_name("")
 
     vue.use_event(name_field, "keydown.enter", create_new_item)
@@ -479,44 +497,54 @@ class State:
     """State for the pvcast configuration page."""
 
     pv_plants: solara.Reactive[dict[str, PVPlant]] = solara.reactive({})
+    array_count = solara.reactive(0)
 
     @staticmethod
     def on_new_plant(plant: PVPlant) -> None:
         """Add a new item to the list of items."""
+        _LOGGER.debug("Adding plant %s to the list.", plant.name)
         for key in State.pv_plants.value:
             if key == plant.name:
+                _LOGGER.debug("Plant %s already exists.", plant.name)
                 return
         State.pv_plants.set({**State.pv_plants.value, plant.name: plant})
+        _LOGGER.debug("State.pv_plants after adding plant: %s", State.pv_plants.value)
 
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
+        State.array_count.set(State.array_count.value + 1)
+
+        # if the array name is empty, generate a new name
         if array.name == "":
-            arr_names = [arr.name for arr in plant.arrays]
-            count = 1
-            name = f"Array {count}"
-            while name in arr_names:
-                count += 1
-                name = f"Array {count}"
-            array = dataclasses.replace(array, name=name)
-        plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
+            array = dataclasses.replace(array, name=f"Array {State.array_count.value}")
+        _LOGGER.debug("Adding array %s to plant %s.", array.name, plant.name)
+
+        # sort the arrays by name before adding the new array to the plant
+        plant = dataclasses.replace(plant, arrays=sorted([*plant.arrays, array], key=lambda x: x.name))
+
+        # update the plant in the dictionary
         new_dict = dict(State.pv_plants.value)
         new_dict[plant.name] = plant
         State.pv_plants.set(new_dict)
+        _LOGGER.debug("State.pv_plants after adding array: %s", State.pv_plants.value)
 
     @staticmethod
     def on_delete_plant(plant: PVPlant) -> None:
         """Delete a plant from the plant dictionary."""
+        _LOGGER.debug("Deleting plant %s from the list.", plant.name)
         try:
             new_dict = dict(State.pv_plants.value)
             new_dict.pop(plant.name)
             State.pv_plants.set(new_dict)
         except KeyError:
             _LOGGER.exception("Plant %s not found in plant list.", plant.name)
+        _LOGGER.debug("State.pv_plants after deleting plant: %s", State.pv_plants.value)
 
     @staticmethod
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Delete an array from a plant."""
+        _LOGGER.debug("Deleting array %s from plant %s.", array.name, plant.name)
         try:
             new_arrays = list(plant.arrays)
             new_arrays.remove(array)
@@ -529,7 +557,7 @@ class State:
 
     # represent the class content as a dictionary
     @staticmethod
-    def as_dict() -> str:
+    def as_dict() -> dict[str, Any]:
         """Return the class content as a dictionary."""
         plant_dict = {"plant": []}
         for plant in State.pv_plants.value.values():
@@ -548,27 +576,33 @@ def Page() -> ValueElement:
     """
     file_missing, set_file_missing = solara.use_state(initial=False)
     save_success, set_save_success = solara.use_state(initial=False)
+    save_error, set_save_error = solara.use_state(initial=False)
+    err_message, set_err_message = solara.use_state("")
 
     def on_save() -> None:
         """Save the configuration."""
-        if not Path.exists(CONFIG_FILE_PATH):
-            # create the file if it does not exist
-            with Path.open(CONFIG_FILE_PATH, "w+") as file:
-                yaml.dump(State.as_dict(), file, default_flow_style=False)
+        config_final: dict[str, Any] = {}
+        config_state: dict[str, Any] = State.as_dict()
 
-        else:
-            # update the file
-            config: dict[str, Any] = {}
-            with Path.open(CONFIG_FILE_PATH, "r") as file:
-                if config := yaml.safe_load(file):
-                    config.update(State.as_dict())
-                else:
-                    config = State.as_dict()
-            with Path.open(CONFIG_FILE_PATH, "w+") as file:
-                yaml.dump(config, file, default_flow_style=False)
+        # if the current config is empty we won't save it but show an error
+        if len(config_state["plant"]) == 0:
+            set_save_error(True)
+            set_err_message("No plants configured yet.")
+            _LOGGER.debug("Tried to save an empty configuration.")
+            return
+
+        # if config.yaml is present and not empty, update config_final with its content
+        if Path.exists(CONFIG_FILE_PATH):
+            config_final = yaml.safe_load(Path.open(CONFIG_FILE_PATH, "r"))
+
+        # update config_final with the current state
+        with Path.open(CONFIG_FILE_PATH, "w+") as file:
+            config_final.update(config_state)
+            yaml.dump(config_final, file, default_flow_style=False, sort_keys=False)
 
         # generate a snack bar message
         set_save_success(True)
+        _LOGGER.debug("Configuration saved successfully to %s.", CONFIG_FILE_PATH)
 
     def on_load() -> None:
         """Load the configuration."""
@@ -631,7 +665,7 @@ def Page() -> ValueElement:
                     # show a snack bar if the file does not exist
                     snack_file = vue.Snackbar(
                         v_model=file_missing,
-                        timeout=3000,
+                        timeout=SNACKBACK_TIMEOUT,
                         color="error",
                         children=[f"No configuration file found at {CONFIG_FILE_PATH}."],
                         on_v_model=set_file_missing,
@@ -641,12 +675,22 @@ def Page() -> ValueElement:
                     # show a snack bar if the file was saved successfully
                     snack_save = vue.Snackbar(
                         v_model=save_success,
-                        timeout=3000,
+                        timeout=SNACKBACK_TIMEOUT,
                         color="success",
                         children=[f"Configuration saved successfully to {CONFIG_FILE_PATH}."],
                         on_v_model=set_save_success,
                     )
                     solara.display(snack_save)
+
+                    # show a snack bar if the file couldn't be saved
+                    snack_error = vue.Snackbar(
+                        v_model=save_error,
+                        timeout=SNACKBACK_TIMEOUT,
+                        color="error",
+                        children=[f"Error saving configuration to {CONFIG_FILE_PATH}. Reason: {err_message}"],
+                        on_v_model=set_save_error,
+                    )
+                    solara.display(snack_error)
 
                 # list all plants
                 if (
