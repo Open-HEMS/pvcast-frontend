@@ -1,0 +1,33 @@
+plant:
+- name: First Plant
+  inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+  microinverter: false
+  arrays:
+  - name: North
+    tilt: 32
+    azimuth: 100
+    modules_per_string: 12
+    strings: 5
+    module: A10Green_Technology_A10J_M60_235
+  - name: South
+    tilt: 14
+    azimuth: 123
+    modules_per_string: 10
+    strings: 6
+    module: Trina_Solar_TSM_170D
+- name: Second Plant
+  inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+  microinverter: false
+  arrays:
+  - name: North
+    tilt: 30
+    azimuth: 180
+    modules_per_string: 1
+    strings: 1
+    module: Trina_Solar_TSM_330DD06H_II_
+  - name: South
+    tilt: 30
+    azimuth: 180
+    modules_per_string: 1
+    strings: 1
+    module: Trina_Solar_TSM_330DD06H_II_
