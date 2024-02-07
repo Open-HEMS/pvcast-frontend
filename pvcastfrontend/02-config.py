@@ -3,12 +3,17 @@ import dataclasses
 import itertools
 import logging
 import os
+import typing
 from pathlib import Path
-from typing import Any, Callable
 
 import polars as pl
 import reacton.ipyvuetify as vue
 import solara
+import solara.lab
+
+# from voluptuous import vol.Coerce, vol.Coerce, IsTrue, vol.Range, vol.Required, vol.Schema
+import voluptuous as vol
+import voluptuous.error
 import yaml
 from reacton.core import ValueElement
 from solara.lab.toestand import Ref
@@ -21,15 +26,11 @@ LOG_FORMAT = "%(asctime)s [%(levelname)8s] %(message)s (%(name)s:%(lineno)s)"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 logging.basicConfig(
-    level=logging.WARNING,
-    format=LOG_FORMAT,
-    datefmt=DATE_FORMAT,
-    force=True
+    level=logging.ERROR, format=LOG_FORMAT, datefmt=DATE_FORMAT, force=True
 )
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
-
 
 
 """
@@ -113,7 +114,7 @@ def generate_regex_pattern(input_string: str) -> str:
     return "|".join(patterns)
 
 
-def filter_list(*_: Any, input_data: pl.LazyFrame, query: str = "") -> None:
+def filter_list(*_: typing.Any, input_data: pl.LazyFrame, query: str = "") -> None:
     """Filter the list for the given query.
 
     :param input_data: the input data to filter
@@ -149,6 +150,32 @@ def SliderRow(
     with solara.Row():
         solara.SliderInt(label=label, value=value, min=min_val, max=max_val)
         solara.Info(f"{value.value}" + postfix, dense=True, icon=False)
+
+
+@solara.component
+def InputIntRow(label: str, value: solara.Reactive[int]) -> ValueElement:
+    """Create a row with an input field for integers."""
+    with solara.Row():
+        solara.InputInt(label=label, value=value)
+        button_style = {"height": "30px", "width": "30px"}
+
+        # plus 1 button
+        solara.Button(
+            icon_name="mdi-plus",
+            on_click=lambda: value.set(value.value + 1),
+            style=button_style,
+            color="green",
+            outlined=True,
+        )
+
+        # minus 1 button
+        solara.Button(
+            icon_name="mdi-minus",
+            on_click=lambda: value.set(max(value.value - 1, 1)),
+            style=button_style,
+            color="red",
+            outlined=True,
+        )
 
 
 @solara.component
@@ -207,8 +234,8 @@ def PVComponentSelect(
 def ArrayEdit(
     pv_plant: solara.Reactive[PVPlant],
     array: solara.Reactive[ArrayConfig],
-    on_delete: Callable[[], None],
-    on_close: Callable[[], None],
+    on_delete: typing.Callable[[], None],
+    on_close: typing.Callable[[], None],
 ) -> ValueElement:
     """Take a reactive array and allows editing it.
 
@@ -218,10 +245,9 @@ def ArrayEdit(
 
     def save() -> None:
         """Save the edited array."""
-        State.on_new_array(pv_plant.value, copy.value)
-        State.on_delete_array(pv_plant.value, array.value)
+        pv_plant.value.arrays[pv_plant.value.arrays.index(array.value)] = copy.value
+        _LOGGER.debug("Saving the array via edit button: %s", copy.value)
         on_close()
-
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
         solara.InputText(
@@ -247,23 +273,15 @@ def ArrayEdit(
             postfix="°",
         )
 
-        # modules per string
-        SliderRow(
-            label="Modules per string",
-            value=Ref(copy.fields.modules_per_string),
-            min_val=1,
-            max_val=20,
-        )
+        # modules per string and strings per inverter
+        padding_top = {"padding-top": "16px", "padding-bottom": "16px"}
+        with solara.Column(style=padding_top):
+            InputIntRow(
+                label="Modules per string", value=Ref(copy.fields.modules_per_string)
+            )
+            InputIntRow(label="Strings", value=Ref(copy.fields.strings))
 
-        # strings per inverter
-        SliderRow(
-            label="Strings per inverter",
-            value=Ref(copy.fields.strings),
-            min_val=1,
-            max_val=20,
-        )
-
-        # select module
+        # module selector for the array
         PVComponentSelect(copy, mod_param, "module")
 
         with solara.CardActions():
@@ -294,8 +312,8 @@ def ArrayEdit(
 @solara.component
 def PVPlantEdit(
     pv_plant: solara.Reactive[PVPlant],
-    on_delete: Callable[[], None],
-    on_close: Callable[[], None],
+    on_delete: typing.Callable[[], None],
+    on_close: typing.Callable[[], None],
 ) -> ValueElement:
     """Take a reactive pv_plant and allows editing it.
 
@@ -305,10 +323,8 @@ def PVPlantEdit(
 
     def save() -> None:
         """Save the edited pv_plant."""
+        State.on_delete_plant(pv_plant.value)
         State.on_new_plant(copy.value)
-        # if the name has changed, delete the old plant
-        if pv_plant.value.name != copy.value.name:
-            State.on_delete_plant(pv_plant.value)
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
@@ -318,6 +334,18 @@ def PVPlantEdit(
 
         # select inverter
         PVComponentSelect(copy, inv_param, "inverter")
+
+        # microinverter switch
+        solara.Checkbox(
+            label="Toggle if inverter is a microinverter",
+            value=Ref(copy.fields.microinverter),
+        )
+        solara.Info(
+            "A microinverter is a small inverter that is typically attached at each solar panel, "
+            "with each panel having its own inverter. This is in contrast to a string inverter, "
+            "which is connected to multiple panels. Example of microinverters are Enphase IQ series.",
+            dense=True,
+        )
 
         with solara.CardActions():
             vue.Spacer()
@@ -346,7 +374,7 @@ def PVPlantEdit(
 
 @solara.component
 def PVPlantListItem(
-    pv_plant: solara.Reactive[PVPlant], on_delete: Callable[[PVPlant], None]
+    pv_plant: solara.Reactive[PVPlant], on_delete: typing.Callable[[PVPlant], None]
 ) -> ValueElement:
     """Display a single PV plant item, modifications are done 'in place'.
 
@@ -402,7 +430,7 @@ def PVPlantListItem(
 def ArrayListItem(
     pv_plant: solara.Reactive[PVPlant],
     array: solara.Reactive[ArrayConfig],
-    on_delete: Callable[[ArrayConfig], None],
+    on_delete: typing.Callable[[ArrayConfig], None],
 ) -> ValueElement:
     """Display a single array item, modifications are done 'in place'.
 
@@ -451,7 +479,7 @@ def ArrayListItem(
 
 
 @solara.component
-def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
+def PVPlantNew(on_new: typing.Callable[[PVPlant], None]) -> ValueElement:
     """Component that manages entering new pv_plants.
 
     This component will create a new PVPlant object, and pass it to the on_new callback.
@@ -481,7 +509,7 @@ def PVPlantNew(on_new: Callable[[PVPlant], None]) -> ValueElement:
 
 @solara.component
 def ArrayNew(
-    on_new: Callable[[ArrayConfig], None], plant: solara.Reactive[PVPlant]
+    on_new: typing.Callable[[ArrayConfig], None], plant: solara.Reactive[PVPlant]
 ) -> ValueElement:
     """Component that manages entering new arrays."""
     solara.Button(
@@ -513,21 +541,22 @@ class State:
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
+        _LOGGER.debug("on_new_array start: %s to plant %s.", array.name, plant.name)
         State.array_count.set(State.array_count.value + 1)
 
         # if the array name is empty, generate a new name
         if array.name == "":
+            _LOGGER.debug("Array name is empty, generating a new name.")
             array = dataclasses.replace(array, name=f"Array {State.array_count.value}")
-        _LOGGER.debug("Adding array %s to plant %s.", array.name, plant.name)
+        _LOGGER.debug("on_new_array middle: %s to plant %s.", array.name, plant.name)
 
-        # sort the arrays by name before adding the new array to the plant
-        plant = dataclasses.replace(plant, arrays=sorted([*plant.arrays, array], key=lambda x: x.name))
+        # add the new array to the plant
+        plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
 
         # update the plant in the dictionary
         new_dict = dict(State.pv_plants.value)
         new_dict[plant.name] = plant
         State.pv_plants.set(new_dict)
-        _LOGGER.debug("State.pv_plants after adding array: %s", State.pv_plants.value)
 
     @staticmethod
     def on_delete_plant(plant: PVPlant) -> None:
@@ -553,11 +582,53 @@ class State:
             new_dict[plant.name] = plant
             State.pv_plants.set(new_dict)
         except ValueError:
-            pass
+            _LOGGER.warning(
+                "Deleting array %s but not found in plant %s.", array.name, plant.name
+            )
+
+    @staticmethod
+    def config_schema() -> vol.Schema:
+        """Get the configuration schema as a vol.Schema object.
+
+        :return: Config schema.
+        """
+        _LOGGER.debug("Generating configuration schema.")
+        return vol.Schema(
+            {
+                vol.Required("plant"): vol.All(
+                    [
+                        {
+                            vol.Required("name"): str,
+                            vol.Required("inverter"): str,
+                            vol.Required("microinverter"): vol.Coerce(bool),
+                            vol.Required("arrays"): [
+                                {
+                                    vol.Required("name"): str,
+                                    vol.Required("tilt"): vol.All(
+                                        vol.Coerce(float), vol.Range(min=0, max=90)
+                                    ),
+                                    vol.Required("azimuth"): vol.All(
+                                        vol.Coerce(float), vol.Range(min=0, max=360)
+                                    ),
+                                    vol.Required("modules_per_string"): vol.All(
+                                        int, vol.Range(min=1)
+                                    ),
+                                    vol.Required("strings"): vol.All(
+                                        int, vol.Range(min=1)
+                                    ),
+                                    vol.Required("module"): str,
+                                }
+                            ],
+                        }
+                    ],
+                    vol.Length(min=1),
+                )
+            }
+        )
 
     # represent the class content as a dictionary
     @staticmethod
-    def as_dict() -> dict[str, Any]:
+    def as_dict() -> dict[str, typing.Any]:
         """Return the class content as a dictionary."""
         plant_dict = {"plant": []}
         for plant in State.pv_plants.value.values():
@@ -566,14 +637,8 @@ class State:
 
 
 @solara.component
-def Page() -> ValueElement:
-    """Build the configuration page.
-
-    This page is used to configure the pvcast application.
-
-    It will consist of two columns, one for the active configuration we are editing,
-    and one for the current field we are modifying.
-    """
+def PlantConfiguration() -> ValueElement:
+    """Build the configuration page."""
     file_missing, set_file_missing = solara.use_state(initial=False)
     save_success, set_save_success = solara.use_state(initial=False)
     save_error, set_save_error = solara.use_state(initial=False)
@@ -581,14 +646,14 @@ def Page() -> ValueElement:
 
     def on_save() -> None:
         """Save the configuration."""
-        config_final: dict[str, Any] = {}
-        config_state: dict[str, Any] = State.as_dict()
+        config_final: dict[str, typing.Any] = {}
+        config_state: dict[str, typing.Any] = State.as_dict()
 
         # if the current config is empty we won't save it but show an error
         if len(config_state["plant"]) == 0:
             set_save_error(True)
             set_err_message("No plants configured yet.")
-            _LOGGER.debug("Tried to save an empty configuration.")
+            _LOGGER.warning("Tried to save an empty configuration.")
             return
 
         # if config.yaml is present and not empty, update config_final with its content
@@ -602,7 +667,7 @@ def Page() -> ValueElement:
 
         # generate a snack bar message
         set_save_success(True)
-        _LOGGER.debug("Configuration saved successfully to %s.", CONFIG_FILE_PATH)
+        _LOGGER.info("Configuration saved successfully to %s.", CONFIG_FILE_PATH)
 
     def on_load() -> None:
         """Load the configuration."""
@@ -625,87 +690,127 @@ def Page() -> ValueElement:
         else:
             set_file_missing(True)
 
+    # active configuration
+    with solara.Card(style={"margin": "auto"}):
+        solara.Title("Active configuration")
+        solara.Success(f"Number of configured plants: {len(State.pv_plants.value)}")
+        solara.Markdown("## 🌱 Plants")
+        PVPlantNew(on_new=State.on_new_plant)
 
+        # save plant config as YAML file
+        with solara.Row(style={"width": "100%", "margin": "auto"}):
+            solara.Button(
+                "Save config",
+                icon_name="mdi-content-save",
+                on_click=on_save,
+                outlined=True,
+                name=True,
+                style={"flex-grow": "1"},
+            )
+
+            # load plant config from YAML file
+            solara.Button(
+                "Load config",
+                icon_name="mdi-file-upload",
+                on_click=on_load,
+                outlined=True,
+                name=True,
+                style={"flex-grow": "1"},
+            )
+
+        # show a snack bar if the file does not exist
+        snack_file = vue.Snackbar(
+            v_model=file_missing,
+            timeout=SNACKBACK_TIMEOUT,
+            color="error",
+            children=[f"No configuration file found at {CONFIG_FILE_PATH}."],
+            on_v_model=set_file_missing,
+        )
+        solara.display(snack_file)
+
+        # show a snack bar if the file was saved successfully
+        snack_save = vue.Snackbar(
+            v_model=save_success,
+            timeout=SNACKBACK_TIMEOUT,
+            color="success",
+            children=[f"Configuration saved successfully to {CONFIG_FILE_PATH}."],
+            on_v_model=set_save_success,
+        )
+        solara.display(snack_save)
+
+        # show a snack bar if the file couldn't be saved
+        snack_error = vue.Snackbar(
+            v_model=save_error,
+            timeout=SNACKBACK_TIMEOUT,
+            color="error",
+            children=[
+                f"Error saving configuration to {CONFIG_FILE_PATH}. Reason: {err_message}"
+            ],
+            on_v_model=set_save_error,
+        )
+        solara.display(snack_error)
+
+    # list all plants
+    if (
+        not State.pv_plants.value
+    ):  # the reactive var is never false, but .value can be (when empty)
+        solara.Info("No plants configured yet. Enter a plant name and hit enter.")
+    else:
+        for _, plant_name in enumerate(State.pv_plants.value):
+            pv_plant = Ref(State.pv_plants.fields[plant_name])
+            PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
+
+
+@solara.component
+def PlantConfigurationValidator() -> ValueElement:
+    """Validate the configuration."""
+    with solara.Card(style={"margin": "auto"}):
+        config_state = State.as_dict()
+        if len(config_state["plant"]) == 0:
+            solara.Warning("No plants configured yet.")
+            return
+        try:
+            State.config_schema()(config_state)
+            solara.Success("The configuration is valid.")
+            yaml_config = yaml.dump(
+                config_state, default_flow_style=False, sort_keys=False
+            )
+            solara.HTML(tag="div", unsafe_innerHTML=f"<pre>{yaml_config}</pre>")
+        except (voluptuous.error.Invalid, voluptuous.error.MultipleInvalid) as exc:
+            solara.Error(f"The configuration is invalid: {exc}")
+
+
+@solara.component
+def PlantConfigurationHelpers() -> ValueElement:
+    """Build the configuration page."""
+    with solara.Card(style={"margin": "auto"}):
+        solara.Info("Helpers to aid you in plant configuration.")
+        with solara.lab.Tabs():
+            # configuration validator
+            with solara.lab.Tab(icon_name="mdi-check", label="Config Validator"):
+                PlantConfigurationValidator()
+
+            # design help
+            with solara.lab.Tab("Tab 2"):
+                solara.Markdown("World")
+
+
+@solara.component
+def Page() -> ValueElement:
+    """Build the configuration page.
+
+    This page is used to configure the pvcast application.
+
+    It will consist of two columns, one for the active configuration we are editing,
+    and one for the current field we are modifying.
+    """
     with solara.Column():
-        solara.Title("Plant configuration")
         solara.Info("On this page you can configure your plant(s).")
         with solara.Columns([4, 5]):
+            # configuration editor
             with solara.Column():
+                PlantConfiguration()
 
-                # active configuration
-                with solara.Card(style={"margin": "auto"}):
-                    solara.Title("Active configuration")
-                    solara.Success(
-                        f"Number of configured plants: {len(State.pv_plants.value)}"
-                    )
-                    solara.Markdown("## 🌱 Plants")
-                    PVPlantNew(on_new=State.on_new_plant)
-
-                    # save plant config as YAML file
-                    with solara.Row(style={"width": "100%", "margin": "auto"}):
-                        solara.Button(
-                            "Save config",
-                            icon_name="mdi-content-save",
-                            on_click=on_save,
-                            outlined=True,
-                            name=True,
-                            style={"flex-grow": "1"},
-                        )
-
-                        # load plant config from YAML file
-                        solara.Button(
-                            "Load config",
-                            icon_name="mdi-file-upload",
-                            on_click=on_load,
-                            outlined=True,
-                            name=True,
-                            style={"flex-grow": "1"},
-                        )
-
-                    # show a snack bar if the file does not exist
-                    snack_file = vue.Snackbar(
-                        v_model=file_missing,
-                        timeout=SNACKBACK_TIMEOUT,
-                        color="error",
-                        children=[f"No configuration file found at {CONFIG_FILE_PATH}."],
-                        on_v_model=set_file_missing,
-                    )
-                    solara.display(snack_file)
-
-                    # show a snack bar if the file was saved successfully
-                    snack_save = vue.Snackbar(
-                        v_model=save_success,
-                        timeout=SNACKBACK_TIMEOUT,
-                        color="success",
-                        children=[f"Configuration saved successfully to {CONFIG_FILE_PATH}."],
-                        on_v_model=set_save_success,
-                    )
-                    solara.display(snack_save)
-
-                    # show a snack bar if the file couldn't be saved
-                    snack_error = vue.Snackbar(
-                        v_model=save_error,
-                        timeout=SNACKBACK_TIMEOUT,
-                        color="error",
-                        children=[f"Error saving configuration to {CONFIG_FILE_PATH}. Reason: {err_message}"],
-                        on_v_model=set_save_error,
-                    )
-                    solara.display(snack_error)
-
-                # list all plants
-                if (
-                    not State.pv_plants.value
-                ):  # the reactive var is never false, but .value can be (when empty)
-                    solara.Info(
-                        "No plants configured yet. Enter a plant name and hit enter."
-                    )
-                else:
-                    for _, plant_name in enumerate(State.pv_plants.value):
-                        pv_plant = Ref(State.pv_plants.fields[plant_name])
-                        PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
-
-            # field we are currently editing
-            with solara.Card():
-                solara.Title("Current field")
-                solara.Info("This is the current field.")
-                solara.Button("Edit")
+            # configuration helpers
+            with solara.Column():
+                PlantConfigurationHelpers()
