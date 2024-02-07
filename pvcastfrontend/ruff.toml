@@ -5,5 +5,6 @@ extend-ignore = [
     "N802",  # solara uses camelCase for some functions
     "N999",  # need to number files for solara
     "FA102",  # can't use from __future__ import annotations due to bug
+    "FA100",  # can't use from __future__ import annotations due to bug
     "SIM117", # multilevel with: statements
 ]
