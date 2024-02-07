@@ -6,6 +6,7 @@ import os
 import typing
 from pathlib import Path
 
+import ipyleaflet
 import polars as pl
 import reacton.ipyvuetify as vue
 import solara
@@ -69,6 +70,25 @@ CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", BASE_PATH / ".data/config.
 COMPONENT_PATH = os.environ.get("COMPONENT_PATH", BASE_PATH / ".data/proc")
 mod_param: pl.LazyFrame = pl.scan_csv(COMPONENT_PATH / "cec_modules.csv")
 inv_param: pl.LazyFrame = pl.scan_csv(COMPONENT_PATH / "cec_inverters.csv")
+
+# how-to markdown
+how_to_path = BASE_PATH / ".data/howto.md"
+
+
+def load_howto() -> str:
+    """Load the how-to markdown file."""
+    with Path.open(how_to_path) as file:
+        return file.read()
+
+
+how_to = load_howto()
+
+update_proxy = solara.reactive(0)
+
+
+def update_proxy_callback() -> None:
+    """Update the proxy."""
+    update_proxy.set(update_proxy.value + 1)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -247,6 +267,9 @@ def ArrayEdit(
         """Save the edited array."""
         pv_plant.value.arrays[pv_plant.value.arrays.index(array.value)] = copy.value
         _LOGGER.debug("Saving the array via edit button: %s", copy.value)
+
+        # update the proxy to trigger a refresh
+        update_proxy_callback()
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
@@ -491,7 +514,7 @@ def PVPlantNew(on_new: typing.Callable[[PVPlant], None]) -> ValueElement:
     name_field = vue.TextField(
         v_model=new_name,
         on_v_model=set_new_name,
-        label="Enter a new plant name and press enter to add it to the list.",
+        label="Enter a new plant name and press enter to start or press 'LOAD CONFIG' below.",
     )
 
     def create_new_item(*ignore_args) -> None:
@@ -536,7 +559,6 @@ class State:
                 _LOGGER.debug("Plant %s already exists.", plant.name)
                 return
         State.pv_plants.set({**State.pv_plants.value, plant.name: plant})
-        _LOGGER.debug("State.pv_plants after adding plant: %s", State.pv_plants.value)
 
     @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
@@ -568,7 +590,6 @@ class State:
             State.pv_plants.set(new_dict)
         except KeyError:
             _LOGGER.exception("Plant %s not found in plant list.", plant.name)
-        _LOGGER.debug("State.pv_plants after deleting plant: %s", State.pv_plants.value)
 
     @staticmethod
     def on_delete_array(plant: PVPlant, array: ArrayConfig) -> None:
@@ -654,6 +675,17 @@ def PlantConfiguration() -> ValueElement:
             set_save_error(True)
             set_err_message("No plants configured yet.")
             _LOGGER.warning("Tried to save an empty configuration.")
+            return
+
+        # validate the configuration
+        try:
+            State.config_schema()(config_state)
+        except (voluptuous.error.Invalid, voluptuous.error.MultipleInvalid) as exc:
+            set_save_error(True)
+            set_err_message(f"The configuration is invalid: {exc}")
+            _LOGGER.error(
+                "Error saving configuration, configuration is invalid: %s", exc
+            )
             return
 
         # if config.yaml is present and not empty, update config_final with its content
@@ -764,8 +796,11 @@ def PlantConfiguration() -> ValueElement:
 @solara.component
 def PlantConfigurationValidator() -> ValueElement:
     """Validate the configuration."""
-    with solara.Card(style={"margin": "auto"}):
-        config_state = State.as_dict()
+    # read the proxy to trigger a refresh
+    _ = update_proxy.get()
+    config_state = State.as_dict()
+
+    with solara.Card(style={"overflow-y": "scroll", "height": "750px"}):
         if len(config_state["plant"]) == 0:
             solara.Warning("No plants configured yet.")
             return
@@ -781,18 +816,86 @@ def PlantConfigurationValidator() -> ValueElement:
 
 
 @solara.component
+def PlantConfigurationHowto() -> ValueElement:
+    """Display the how-to markdown."""
+    with solara.Card(style={"overflow-y": "scroll", "height": "750px"}):
+        solara.Markdown(how_to)
+
+@solara.component
+def PlantConfigurationAzimuth() -> ValueElement:
+    """Display the OSM compass for selecting the azimuth."""
+    # default values
+    latitude = os.environ.get("LATITUDE", 51.0)
+    longitude = os.environ.get("LONGITUDE", 3.0)
+    zoom_default = 20
+    center_default = (latitude, longitude)
+
+    # reactive variables
+    center = solara.use_reactive(center_default)
+    marker_location = solara.use_reactive(center_default)
+    zoom = solara.use_reactive(zoom_default)
+
+    # build interactive map
+    ipy_map = ipyleaflet.basemaps.Esri.WorldImagery
+    url = ipy_map.build_url()
+
+    def location_changed(location: typing.Tuple[float, float]) -> None:
+        # do things with the location
+        marker_location.set(location)
+
+    def goto_marker() -> None:
+        center.value = marker_location.value
+        zoom.value = 13
+
+    def reset_view() -> None:
+        center.value = center_default
+        zoom.value = zoom_default
+
+    info_html = """
+<pre><p style="font-family: Arial">Use the compass to find the correct azimuth.
+
+1. Find your location and zoom in.
+2. Orient the compass so that it aligns with your panels.
+3. Read the azimuth angle from the compass.
+4. Enter the azimuth angle in the configuration.</p></pre>
+"""
+
+    solara.Info(children=[solara.HTML(tag="div", unsafe_innerHTML=info_html)])
+
+    with solara.Row():
+        solara.Button(label="Zoom to marker", on_click=goto_marker)
+        solara.Button(label="Reset view", on_click=reset_view)
+
+    # Isolation is required to prevent the map from overlapping navigation (when screen width < 960px)
+    with solara.Column(style={"isolation": "isolate"}):
+        ipyleaflet.Map.element(  # type: ignore[untyped-call]
+            zoom=zoom.value,
+            on_zoom=zoom.set,
+            center=center.value,
+            on_center=center.set,
+            scroll_wheel_zoom=True,
+            layers=[
+                ipyleaflet.TileLayer.element(url=url),
+                ipyleaflet.Marker.element(location=marker_location.value, draggable=True, on_location=location_changed),
+            ],
+        )
+
+@solara.component
 def PlantConfigurationHelpers() -> ValueElement:
     """Build the configuration page."""
     with solara.Card(style={"margin": "auto"}):
-        solara.Info("Helpers to aid you in plant configuration.")
         with solara.lab.Tabs():
+            # design help
+            with solara.lab.Tab(icon_name="mdi-help", label="How-to"):
+                PlantConfigurationHowto()
+
             # configuration validator
             with solara.lab.Tab(icon_name="mdi-check", label="Config Validator"):
                 PlantConfigurationValidator()
 
-            # design help
-            with solara.lab.Tab("Tab 2"):
-                solara.Markdown("World")
+            # OSM compass for selecting the azimuth
+            with solara.lab.Tab(icon_name="mdi-compass", label="OSM Compass"):
+                PlantConfigurationAzimuth()
 
 
 @solara.component
