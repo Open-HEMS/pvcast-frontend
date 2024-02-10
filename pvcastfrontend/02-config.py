@@ -371,8 +371,11 @@ def PVPlantEdit(
 
     def save() -> None:
         """Save the edited pv_plant."""
-        State.on_delete_plant(pv_plant.value)
-        State.on_new_plant(copy.value)
+        pv_plant.value = copy.value
+        _LOGGER.debug("Saving the plant %s via edit button", copy.value.name)
+
+        # update the proxy to trigger a refresh
+        update_proxy_callback()
         on_close()
 
     with solara.Card("Edit", margin=0, style={"justify-content": "space-between"}):
@@ -422,7 +425,9 @@ def PVPlantEdit(
 
 @solara.component
 def PVPlantListItem(
-    pv_plant: solara.Reactive[PVPlant], on_delete: typing.Callable[[PVPlant], None]
+    pv_plant: solara.Reactive[PVPlant],
+    on_delete: typing.Callable[[PVPlant], None],
+    on_duplicate: typing.Callable[[PVPlant], None],
 ) -> ValueElement:
     """Display a single PV plant item, modifications are done 'in place'.
 
@@ -437,16 +442,27 @@ def PVPlantListItem(
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%", "margin": "auto"}):
                 with solara.Row():
+                    # edit the current plant
                     solara.Button(
-                        "EDIT PLANT",
+                        "EDIT",
                         icon_name="mdi-pencil",
                         on_click=lambda: set_edit(True),
                         style={"flex-grow": "1"},
                     )
+
+                    # delete the current plant
                     solara.Button(
-                        "DELETE PLANT",
+                        "DELETE",
                         icon_name="mdi-delete",
                         on_click=lambda: on_delete(pv_plant.value),
+                        style={"flex-grow": "1"},
+                    )
+
+                    # duplicate the current plant
+                    solara.Button(
+                        "DUPLICATE",
+                        icon_name="mdi-content-duplicate",
+                        on_click=lambda: on_duplicate(pv_plant.value),
                         style={"flex-grow": "1"},
                     )
 
@@ -454,7 +470,12 @@ def PVPlantListItem(
                 if pv_plant.value.arrays:
                     for index in range(len(pv_plant.value.arrays)):
                         array = Ref(pv_plant.fields.arrays[index])
-                        ArrayListItem(pv_plant, array, on_delete=State.on_delete_array)
+                        ArrayListItem(
+                            pv_plant,
+                            array,
+                            on_delete=State.on_delete_array,
+                            on_duplicate=State.on_duplicate_array,
+                        )
                 ArrayNew(on_new=State.on_new_array, plant=pv_plant)
 
             with vue.Dialog(
@@ -479,6 +500,7 @@ def ArrayListItem(
     pv_plant: solara.Reactive[PVPlant],
     array: solara.Reactive[ArrayConfig],
     on_delete: typing.Callable[[ArrayConfig], None],
+    on_duplicate: typing.Callable[[ArrayConfig], None],
 ) -> ValueElement:
     """Display a single array item, modifications are done 'in place'.
 
@@ -494,18 +516,30 @@ def ArrayListItem(
         with solara.v.ListItem():
             with solara.Column(style={"width": "100%", "margin": "auto"}):
                 with solara.Row():
+                    # edit the current array
                     solara.Button(
-                        "EDIT ARRAY",
+                        "EDIT",
                         icon_name="mdi-pencil",
                         on_click=lambda: set_edit(True),
-                        style={"flex-grow": "1", "width": "50%"},
+                        style={"flex-grow": "1"},
                         color="primary",
                     )
+
+                    # delete the current array
                     solara.Button(
-                        "DELETE ARRAY",
+                        "DELETE",
                         icon_name="mdi-delete",
                         on_click=lambda: on_delete(pv_plant.value, array.value),
-                        style={"flex-grow": "1", "width": "50%"},
+                        style={"flex-grow": "1"},
+                        color="primary",
+                    )
+
+                    # duplicate the current array
+                    solara.Button(
+                        "DUPLICATE",
+                        icon_name="mdi-content-duplicate",
+                        on_click=lambda: on_duplicate(pv_plant.value, array.value),
+                        style={"flex-grow": "1"},
                         color="primary",
                     )
             with vue.Dialog(
@@ -586,16 +620,33 @@ class State:
         State.pv_plants.set({**State.pv_plants.value, plant.name: plant})
 
     @staticmethod
+    def on_duplicate_plant(plant: PVPlant) -> None:
+        """Duplicate a plant."""
+        _LOGGER.debug("Duplicating plant %s.", plant.name)
+        plant_copy = dataclasses.replace(
+            plant, name=f"{plant.name.split()[0]} (copy {State.array_count.value})"
+        )
+        State.on_new_plant(plant_copy)
+
+    @staticmethod
+    def on_duplicate_array(plant: PVPlant, array: ArrayConfig) -> None:
+        """Duplicate an array."""
+        _LOGGER.debug("Duplicating array %s.", array.name)
+        array_copy = dataclasses.replace(
+            array, name=f"{array.name.split()[0]} (copy {State.array_count.value})"
+        )
+        State.on_new_array(plant, array_copy)
+
+    @staticmethod
     def on_new_array(plant: PVPlant, array: ArrayConfig) -> None:
         """Add a new array to a plant."""
-        _LOGGER.debug("on_new_array start: %s to plant %s.", array.name, plant.name)
+        _LOGGER.debug("Adding new array %s to plant %s.", array.name, plant.name)
         State.array_count.set(State.array_count.value + 1)
 
         # if the array name is empty, generate a new name
         if array.name == "":
             _LOGGER.debug("Array name is empty, generating a new name.")
             array = dataclasses.replace(array, name=f"Array {State.array_count.value}")
-        _LOGGER.debug("on_new_array middle: %s to plant %s.", array.name, plant.name)
 
         # add the new array to the plant
         plant = dataclasses.replace(plant, arrays=[*plant.arrays, array])
@@ -815,7 +866,11 @@ def PlantConfiguration() -> ValueElement:  # noqa: PLR0915
     else:
         for _, plant_name in enumerate(State.pv_plants.value):
             pv_plant = Ref(State.pv_plants.fields[plant_name])
-            PVPlantListItem(pv_plant, on_delete=State.on_delete_plant)
+            PVPlantListItem(
+                pv_plant,
+                on_delete=State.on_delete_plant,
+                on_duplicate=State.on_duplicate_plant,
+            )
 
 
 @solara.component
@@ -973,10 +1028,14 @@ def PlantConfigurationAzimuth() -> ValueElement:
     info_html = """
 <pre><p style="font-family: Arial">Use the compass to find the correct azimuth.
 
-1. Find your location and zoom in.
-2. Orient the compass so that it aligns with your panels.
+1. Find the location of your array and zoom in.
+2. Orient the green line so that it aligns with your panels.
 3. Read the azimuth angle from the compass.
-4. Enter the azimuth angle in the configuration.</p></pre>
+4. Enter the azimuth angle in the configuration.
+
+Notes:
+- The compass is draggable, and the azimuth angle is updated in real-time.
+- North = 0°, East = 90°, South = 180°, West = 270°.</p></pre>
 """
     solara.Info(children=[solara.HTML(tag="div", unsafe_innerHTML=info_html)])
 
