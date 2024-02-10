@@ -53,6 +53,7 @@
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers-contrib/features/poetry:2": {},
+    "ghcr.io/devcontainers-contrib/features/pre-commit:2": {},
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installOhMyZsh": true
     },
@@ -63,7 +64,5 @@
   },
   "containerEnv": {
     "POETRY_VIRTUALENVS_IN_PROJECT": "true"
-  },
-  "onCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
-  "updateContentCommand": "poetry install && [ -d .git ] && poetry run pre-commit install"
+  }
 }
