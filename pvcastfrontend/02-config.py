@@ -2,11 +2,12 @@
 import dataclasses
 import itertools
 import logging
+import math
 import os
 import typing
 from pathlib import Path
 
-import ipyleaflet
+import ipyleaflet as leaf
 import polars as pl
 import reacton.ipyvuetify as vue
 import solara
@@ -83,6 +84,7 @@ def load_howto() -> str:
 
 how_to = load_howto()
 
+# update proxy for triggering a refresh
 update_proxy = solara.reactive(0)
 
 
@@ -176,7 +178,13 @@ def SliderRow(
 def InputIntRow(label: str, value: solara.Reactive[int]) -> ValueElement:
     """Create a row with an input field for integers."""
     with solara.Row():
-        solara.InputInt(label=label, value=value)
+
+        def filter_value(*args: str) -> None:
+            """Filter the input field."""
+            val = max(int(args[-1]), 1)
+            value.set(val)
+
+        solara.InputInt(label=label, value=value, on_value=filter_value)
         button_style = {"height": "30px", "width": "30px"}
 
         # plus 1 button
@@ -191,7 +199,7 @@ def InputIntRow(label: str, value: solara.Reactive[int]) -> ValueElement:
         # minus 1 button
         solara.Button(
             icon_name="mdi-minus",
-            on_click=lambda: value.set(max(value.value - 1, 1)),
+            on_click=lambda: value.set(value.value - 1),
             style=button_style,
             color="red",
             outlined=True,
@@ -658,7 +666,7 @@ class State:
 
 
 @solara.component
-def PlantConfiguration() -> ValueElement:
+def PlantConfiguration() -> ValueElement:  # noqa: PLR0915
     """Build the configuration page."""
     file_missing, set_file_missing = solara.use_state(initial=False)
     save_success, set_save_success = solara.use_state(initial=False)
@@ -683,7 +691,7 @@ def PlantConfiguration() -> ValueElement:
         except (voluptuous.error.Invalid, voluptuous.error.MultipleInvalid) as exc:
             set_save_error(True)
             set_err_message(f"The configuration is invalid: {exc}")
-            _LOGGER.error(
+            _LOGGER.error(  # noqa: TRY400
                 "Error saving configuration, configuration is invalid: %s", exc
             )
             return
@@ -821,36 +829,109 @@ def PlantConfigurationHowto() -> ValueElement:
     with solara.Card(style={"overflow-y": "scroll", "height": "750px"}):
         solara.Markdown(how_to)
 
+
+class Compass(leaf.Marker):
+    """Compass is a composite marker."""
+
+    def __init__(
+        self, lf_map: leaf.Map, radius: int = 20, azimuth: solara.Reactive[int] = 0
+    ):
+        """Create a compass marker."""
+        super().__init__(
+            location=lf_map.center,
+            draggable=True,
+            on_move=self._update_location,
+        )
+        self._zoom_default = 20
+        self._center_default = (lf_map.center[0], lf_map.center[1])
+        self.m_to_lat = lambda meters: meters / 110_574
+        self.radius = radius
+        self.azimuth = azimuth
+
+        # reactive variables
+        self._center: solara.Reactive[typing.Tuple[float, float]] = solara.use_reactive(
+            self._center_default
+        )
+        self._zoom = solara.use_reactive(self._zoom_default)
+
+        # composite markers
+        self._circle = leaf.Circle(
+            location=self._center.value,
+            radius=radius,
+            color="red",
+            fill_color="blue",
+            fill_opacity=0.1,
+        )
+
+        self._north_line = leaf.Polyline(
+            locations=[
+                (self._center.value[0], self._center.value[1]),
+                (self._center.value[0] + 0.95 * self.m_to_lat(radius), self._center.value[1]),
+            ],
+            color="red",
+            fill=False,
+        )
+
+        # azimuth angle indicator polyline
+        self.azimuth_line = leaf.Polyline(
+            locations=[
+                (self._center.value[0], self._center.value[1]),
+                self.calc_new_latlon(*self._center.value, 90),
+            ],
+            color="green",
+            fill=False,
+        )
+
+        # link movements
+        super().observe(self._update_location, "location")
+
+        # layer group
+        self.layer_group = leaf.LayerGroup(
+            layers=(self._circle, self._north_line, self, self.azimuth_line),
+            name="Compass",
+        )
+
+    def _update_location(self, *_: typing.Any) -> None:
+        """Update the location."""
+        self._circle.location = super().location
+        self._north_line.locations = [
+            super().location,
+            (super().location[0] + self.m_to_lat(self.radius), super().location[1]),
+        ]
+
+        # calculate distances
+        self.azimuth_line.locations = [
+            super().location,
+            self.calc_new_latlon(*super().location, self.azimuth.value),
+        ]
+
+    def calc_new_latlon(
+        self, lat: float, lon: float, angle_deg: float
+    ) -> tuple[float, float]:
+        """Calculate new latitude and longitude based on a rotation angle."""
+        # clockwise rotation correction
+        angle_deg = -1 * angle_deg
+
+        # distance in meters from the center for x and y
+        dist_y = self.radius * math.cos(math.radians(angle_deg))
+        dist_x = self.radius * math.sin(math.radians(angle_deg)) * 1.05
+
+        # radius of the earth in meters
+        xi = 6378137
+
+        # new latitude and longitude taking into account the earth's curvature
+        new_lat = lat + (180 / math.pi) * (dist_y / xi)
+        new_lon = lon + (180 / math.pi) * (dist_x / xi) / math.cos(lat)
+        return new_lat, new_lon
+
+
 @solara.component
 def PlantConfigurationAzimuth() -> ValueElement:
-    """Display the OSM compass for selecting the azimuth."""
-    # default values
-    latitude = os.environ.get("LATITUDE", 51.0)
-    longitude = os.environ.get("LONGITUDE", 3.0)
-    zoom_default = 20
-    center_default = (latitude, longitude)
+    """Display compass for help in determining the PV array azimuth.
 
-    # reactive variables
-    center = solara.use_reactive(center_default)
-    marker_location = solara.use_reactive(center_default)
-    zoom = solara.use_reactive(zoom_default)
-
-    # build interactive map
-    ipy_map = ipyleaflet.basemaps.Esri.WorldImagery
-    url = ipy_map.build_url()
-
-    def location_changed(location: typing.Tuple[float, float]) -> None:
-        # do things with the location
-        marker_location.set(location)
-
-    def goto_marker() -> None:
-        center.value = marker_location.value
-        zoom.value = 13
-
-    def reset_view() -> None:
-        center.value = center_default
-        zoom.value = zoom_default
-
+    Compass PNG attribution:
+    https://www.freepnglogos.com/images/compass-17143.html
+    """
     info_html = """
 <pre><p style="font-family: Arial">Use the compass to find the correct azimuth.
 
@@ -859,26 +940,70 @@ def PlantConfigurationAzimuth() -> ValueElement:
 3. Read the azimuth angle from the compass.
 4. Enter the azimuth angle in the configuration.</p></pre>
 """
-
     solara.Info(children=[solara.HTML(tag="div", unsafe_innerHTML=info_html)])
 
-    with solara.Row():
-        solara.Button(label="Zoom to marker", on_click=goto_marker)
-        solara.Button(label="Reset view", on_click=reset_view)
+    # default values
+    latitude = float(os.environ.get("LATITUDE", 51.0))
+    longitude = float(os.environ.get("LONGITUDE", 3.0))
+    zoom_default = 20
+    center_default = (latitude, longitude)
+
+    # reactive variables
+    center = solara.use_reactive(center_default)
+    zoom = solara.use_reactive(zoom_default)
+    azimuth_angle = solara.use_reactive(90)
+
+    # add basemaps
+    maps = {
+        "WorldImagery": leaf.basemaps.Esri.WorldImagery,
+    }
+
+    # define the map
+    lf_map = leaf.Map(
+        zoom=zoom.value,
+        center=center.value,
+        scroll_wheel_zoom=True,
+        basemap=leaf.basemaps.OpenStreetMap.Mapnik,
+    )
+
+    # add basemaps
+    for name, basemap in maps.items():
+        tile_map = leaf.basemap_to_tiles(basemap)
+        tile_map.name = name
+        tile_map.base = True
+        lf_map.add_layer(tile_map)
+
+    # add controls
+    lf_map.add_control(leaf.FullScreenControl())
+    lf_map.add_control(leaf.LayersControl())
+    lf_map.attribution_control = False
+
+    # create compass
+    compass = Compass(lf_map, azimuth=azimuth_angle)
+    lf_map.add_layer(compass.layer_group)
+
+    # update the angle of the azimuth line when the slider changes
+    def update_line_angle(*_: typing.Any) -> None:
+        """Update the azimuth line."""
+        compass.azimuth_line.locations = [
+            compass.location,
+            compass.calc_new_latlon(*compass.location, azimuth_angle.value),
+        ]
+
+    # add azimuth angle slider
+    solara.SliderInt(
+        label="Azimuth angle",
+        value=azimuth_angle,
+        min=0,
+        max=360,
+        step=1,
+        on_value=update_line_angle,
+    )
 
     # Isolation is required to prevent the map from overlapping navigation (when screen width < 960px)
-    with solara.Column(style={"isolation": "isolate"}):
-        ipyleaflet.Map.element(  # type: ignore[untyped-call]
-            zoom=zoom.value,
-            on_zoom=zoom.set,
-            center=center.value,
-            on_center=center.set,
-            scroll_wheel_zoom=True,
-            layers=[
-                ipyleaflet.TileLayer.element(url=url),
-                ipyleaflet.Marker.element(location=marker_location.value, draggable=True, on_location=location_changed),
-            ],
-        )
+    with solara.Column(style={"isolation": "isolate", "height": "400px"}):
+        solara.display(lf_map)
+
 
 @solara.component
 def PlantConfigurationHelpers() -> ValueElement:
