@@ -951,8 +951,8 @@ class Compass(leaf.Marker):
         angle_deg = -1 * angle_deg
 
         # distance in meters from the center for x and y
-        dist_y = 1.5 * self.radius * math.cos(math.radians(angle_deg))
-        dist_x = 1.5 * self.radius * math.sin(math.radians(angle_deg)) * 1.05
+        dist_y = 1.2 * self.radius * math.cos(math.radians(angle_deg)) * 1.05
+        dist_x = 1.2 * self.radius * math.sin(math.radians(angle_deg))
 
         # radius of the earth in meters
         xi = 6378137
@@ -1058,7 +1058,7 @@ def PlantConfigurationHelpers() -> ValueElement:
                 PlantConfigurationValidator()
 
             # OSM compass for selecting the azimuth
-            with solara.lab.Tab(icon_name="mdi-compass", label="OSM Compass"):
+            with solara.lab.Tab(icon_name="mdi-compass", label="Compass"):
                 PlantConfigurationAzimuth()
 
 
