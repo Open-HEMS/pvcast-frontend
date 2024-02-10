@@ -167,25 +167,37 @@ def SliderRow(
     min_val: int,
     max_val: int,
     postfix: str = "",
+    **kwargs: typing.Any,
 ) -> ValueElement:
     """Create a row with a slider and a value display."""
     with solara.Row():
-        solara.SliderInt(label=label, value=value, min=min_val, max=max_val)
+        solara.SliderInt(label=label, value=value, min=min_val, max=max_val, **kwargs)
         solara.Info(f"{value.value}" + postfix, dense=True, icon=False)
 
 
 @solara.component
-def InputIntRow(label: str, value: solara.Reactive[int]) -> ValueElement:
+def InputIntRow(
+    label: str,
+    value: solara.Reactive[int],
+    upper_bound: int = math.inf,
+    lower_bound: int = 0,
+) -> ValueElement:
     """Create a row with an input field for integers."""
     with solara.Row():
 
         def filter_value(*args: str) -> None:
             """Filter the input field."""
-            val = max(int(args[-1]), 1)
+            val = max(int(args[-1]), lower_bound)
+            val = min(val, upper_bound)
             value.set(val)
 
         solara.InputInt(label=label, value=value, on_value=filter_value)
-        button_style = {"height": "30px", "width": "30px"}
+        button_style = {
+            "height": "30px",
+            "width": "25px",
+            "margin-top": "15px",
+            "margin-bottom": "0px",
+        }
 
         # plus 1 button
         solara.Button(
@@ -286,31 +298,36 @@ def ArrayEdit(
         )
         solara.Style(sliders_css)
 
-        # panel tilt
-        SliderRow(
-            label="Tilt",
-            value=Ref(copy.fields.tilt),
-            min_val=0,
-            max_val=90,
-            postfix="°",
-        )
-
-        # panel azimuth
-        SliderRow(
-            label="Azimuth",
-            value=Ref(copy.fields.azimuth),
-            min_val=0,
-            max_val=360,
-            postfix="°",
-        )
-
         # modules per string and strings per inverter
         padding_top = {"padding-top": "16px", "padding-bottom": "16px"}
         with solara.Column(style=padding_top):
+            # panel tilt
             InputIntRow(
-                label="Modules per string", value=Ref(copy.fields.modules_per_string)
+                label="Tilt in degrees from horizontal",
+                value=Ref(copy.fields.tilt),
+                upper_bound=90,
             )
-            InputIntRow(label="Strings", value=Ref(copy.fields.strings))
+
+            # panel azimuth
+            InputIntRow(
+                label="Azimuth in degrees clockwise from North",
+                value=Ref(copy.fields.azimuth),
+                upper_bound=360,
+            )
+
+            # modules per string
+            InputIntRow(
+                label="Modules per string (inverter input)",
+                value=Ref(copy.fields.modules_per_string),
+                lower_bound=1,
+            )
+
+            # number of strings
+            InputIntRow(
+                label="Number of strings connected to the inverter",
+                value=Ref(copy.fields.strings),
+                lower_bound=1,
+            )
 
         # module selector for the array
         PVComponentSelect(copy, mod_param, "module")
@@ -835,12 +852,14 @@ class Compass(leaf.Marker):
 
     def __init__(
         self, lf_map: leaf.Map, radius: int = 20, azimuth: solara.Reactive[int] = 0
-    ):
+    ) -> None:
         """Create a compass marker."""
+        icon = leaf.AwesomeIcon(name="fa-bolt", marker_color="red", icon_color="black")
         super().__init__(
             location=lf_map.center,
             draggable=True,
             on_move=self._update_location,
+            icon=icon,
         )
         self._zoom_default = 20
         self._center_default = (lf_map.center[0], lf_map.center[1])
@@ -858,7 +877,7 @@ class Compass(leaf.Marker):
         self._circle = leaf.Circle(
             location=self._center.value,
             radius=radius,
-            color="red",
+            color="black",
             fill_color="blue",
             fill_opacity=0.1,
         )
@@ -866,10 +885,22 @@ class Compass(leaf.Marker):
         self._north_line = leaf.Polyline(
             locations=[
                 (self._center.value[0], self._center.value[1]),
-                (self._center.value[0] + 0.95 * self.m_to_lat(radius), self._center.value[1]),
+                (
+                    self._center.value[0] + 0.95 * self.m_to_lat(radius),
+                    self._center.value[1],
+                ),
             ],
-            color="red",
+            color="black",
             fill=False,
+        )
+
+        # center circle marker
+        self._center_circle = leaf.CircleMarker(
+            location=self._center.value,
+            radius=5,
+            color="black",
+            fill_color="red",
+            fill_opacity=1,
         )
 
         # azimuth angle indicator polyline
@@ -885,15 +916,22 @@ class Compass(leaf.Marker):
         # link movements
         super().observe(self._update_location, "location")
 
-        # layer group
+        # group so we can name and deselect all markers simultaneously
         self.layer_group = leaf.LayerGroup(
-            layers=(self._circle, self._north_line, self, self.azimuth_line),
+            layers=(
+                self._circle,
+                self._north_line,
+                self,
+                self.azimuth_line,
+                self._center_circle,
+            ),
             name="Compass",
         )
 
     def _update_location(self, *_: typing.Any) -> None:
         """Update the location."""
         self._circle.location = super().location
+        self._center_circle.location = super().location
         self._north_line.locations = [
             super().location,
             (super().location[0] + self.m_to_lat(self.radius), super().location[1]),
@@ -913,8 +951,8 @@ class Compass(leaf.Marker):
         angle_deg = -1 * angle_deg
 
         # distance in meters from the center for x and y
-        dist_y = self.radius * math.cos(math.radians(angle_deg))
-        dist_x = self.radius * math.sin(math.radians(angle_deg)) * 1.05
+        dist_y = 1.5 * self.radius * math.cos(math.radians(angle_deg))
+        dist_x = 1.5 * self.radius * math.sin(math.radians(angle_deg)) * 1.05
 
         # radius of the earth in meters
         xi = 6378137
@@ -929,8 +967,8 @@ class Compass(leaf.Marker):
 def PlantConfigurationAzimuth() -> ValueElement:
     """Display compass for help in determining the PV array azimuth.
 
-    Compass PNG attribution:
-    https://www.freepnglogos.com/images/compass-17143.html
+    Icon attribution:
+    <a href="https://www.flaticon.com/free-icons/close" title="close icons">Close icons created by Darius Dan - Flaticon</a>
     """
     info_html = """
 <pre><p style="font-family: Arial">Use the compass to find the correct azimuth.
@@ -991,12 +1029,13 @@ def PlantConfigurationAzimuth() -> ValueElement:
         ]
 
     # add azimuth angle slider
-    solara.SliderInt(
-        label="Azimuth angle",
+    solara.Style(sliders_css)
+    SliderRow(
+        label="Azimuth",
         value=azimuth_angle,
-        min=0,
-        max=360,
-        step=1,
+        min_val=0,
+        max_val=360,
+        postfix="°",
         on_value=update_line_angle,
     )
 

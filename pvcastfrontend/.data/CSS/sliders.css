@@ -1,7 +1,7 @@
 .v-application--is-ltr .v-input__slider .v-input__slot .v-label {
     margin-left: 0;
     margin-right: 12px;
-    width: 35%;
+    width: 15%;
     white-space: nowrap;
     overflow: hidden;
 }
